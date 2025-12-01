@@ -88,6 +88,7 @@ This README provides a practical guide to the core workflow. For advanced topics
 7.  **[Testing Guardrails](./docs/07_guardrail_testing.md)**: Evaluate guardrail effectiveness and false positive rates.
 8.  **[Interpreting Spikee Results](./docs/08_interpreting_results.md)**: Understand test reports and performance metrics.
 9.  **[Generating Custom Datasets with an LLM](./docs/09_llm_dataset_generation.md)**: Create tailored datasets for specific use cases.
+10. **[Functional Testing Guide](./docs/functional_testing.md)**: Run the end-to-end CLI regression suite locally.
 ---
 
 ## 1. Installation
