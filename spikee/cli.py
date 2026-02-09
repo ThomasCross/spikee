@@ -26,7 +26,11 @@ from .list import (
     list_plugins,
     list_attacks,
 )
-from .viewer import run_viewer
+<<<<<<< HEAD
+from .viewers.result_viewer import run_result_viewer
+=======
+from .result_viewer import run_result_viewer
+>>>>>>> d58c8ef31b313c54a01956c4f3765595fa05d25c
 
 
 banner = r"""
@@ -497,39 +501,39 @@ def main():
         "--tag", default=None, help="Include a tag at the end of the results filename"
     )
 
-    # --- web-viewer
-    parser_web_viewer = subparsers_results.add_parser(
-        "web-viewer", help="Launch a local web viewer, for results JSONL files"
+    # --- result-viewer
+    parser_result_viewer = subparsers_results.add_parser(
+        "result-viewer", help="Launch a local result viewer, for results JSONL files"
     )
-    parser_web_viewer.add_argument(
+    parser_result_viewer.add_argument(
         "--host",
         type=str,
         default="127.0.0.1",
-        help="Host address for the web viewer (default: 127.0.0.1)",
+        help="Host address for the result viewer (default: 127.0.0.1)",
     )
-    parser_web_viewer.add_argument(
+    parser_result_viewer.add_argument(
         "-p",
         "--port",
         type=int,
         default=8080,
-        help="Port number for the web viewer (default: 8080)",
+        help="Port number for the result viewer (default: 8080)",
     )
-    parser_web_viewer.add_argument(
+    parser_result_viewer.add_argument(
         "--result-file",
         type=str,
         action="append",
         help="Path to an results JSONL file, generated using the dataset",
     )
-    parser_web_viewer.add_argument(
+    parser_result_viewer.add_argument(
         "--result-folder",
         type=str,
         action="append",
         help="Path to a results folder containing multiple JSONL files, generated using the dataset",
     )
-    parser_web_viewer.add_argument(
+    parser_result_viewer.add_argument(
         "--allow-ast",
         action="store_true",
-        help="Allow AST parsing in the web viewer (use with caution)",
+        help="Allow AST parsing in the result viewer (use with caution)",
     )
 
     # --- convert-to-excel
@@ -595,8 +599,8 @@ def main():
             extract_results(args)
         elif args.results_command == "dataset-comparison":
             dataset_comparison(args)
-        elif args.results_command == "web-viewer":
-            run_viewer(args)
+        elif args.results_command == "result-viewer":
+            run_result_viewer(args)
         elif args.results_command == "convert-to-excel":
             convert_results_to_excel(args)
         else:

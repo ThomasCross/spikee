@@ -5,7 +5,7 @@ The `spikee results` command includes several tools to aid in the analysis of te
 * `spikee results rejudge`: See [re-judging](<./07_judges.md#Re-judging>), revaluate results using a different judge or options.
 * `spikee results extract`: Extracts user-defined categories of results from results files for further analysis.
 * `spikee results dataset-comparison`: Compares the results of a single dataset across multiple targets to identify trends or differences in performance.
-* `spikee results web-viewer`: Processes results files and displays them in a Flask web application for interactive exploration.
+* `spikee results result-viewer`: Processes results files and displays them in a Flask web application for interactive exploration.
 * `spikee results convert-to-excel`: Converts results files into Excel format.
 
 
@@ -167,7 +167,7 @@ spikee results dataset-comparison --dataset-file datasets/cybersec-2026-01-*.jso
                                   --number 10
 ```
 
-# The `web-viewer` Command
+# The `result-viewer` Command
 This command processes results files and displays them in a Flask web application for interactive exploration.
 
 ## Set-Up
@@ -182,8 +182,8 @@ spikee init --include-viewer
 
 ## Usage Examples
 ```bash
-spikee results web-viewer --result-file results/results_cybersec-2025-04-*.jsonl 
+spikee results result-viewer --result-file results/results_cybersec-2025-04-*.jsonl 
 
 # Specify a different host and port (Defaults, host=127.0.0.1, port=8080)
-spikee results web-viewer --result-file results/results_cybersec-2025-04-*.jsonl --host 192.168.1.10 --port 8081
+spikee results result-viewer --result-file results/results_cybersec-2025-04-*.jsonl --host 192.168.1.10 --port 8081
 ```

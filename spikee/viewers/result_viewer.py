@@ -20,11 +20,11 @@ from spikee.utilities.results import ResultProcessor, generate_query, extract_en
 from spikee.judge import call_judge
 
 
-VIEWER_NAME = "SPIKEE Viewer"
+VIEWER_NAME = "SPIKEE | Result Viewer"
 TRUNCATE_LENGTH = 500
 
 
-def create_viewer(viewer_folder, results_files, host, port, allow_ast=False) -> Flask:
+def create_result_viewer(viewer_folder, results_files, host, port, allow_ast=False) -> Flask:
     viewer = Flask(
         VIEWER_NAME,
         static_folder=os.path.join(viewer_folder, "static"),
@@ -375,7 +375,7 @@ def create_viewer(viewer_folder, results_files, host, port, allow_ast=False) -> 
     return viewer
 
 
-def run_viewer(args):
+def run_result_viewer(args):
     results_files = process_jsonl_input_files(
         args.result_file, args.result_folder, ["results", "rejudge", "extract"]
     )
@@ -394,7 +394,7 @@ def run_viewer(args):
             f"[Error] Viewer folder not found at {viewer_folder}, please run 'spikee init --include-viewer' to set up the viewer files."
         )
 
-    viewer = create_viewer(
+    viewer = create_result_viewer(
         viewer_folder=viewer_folder,
         results_files=results_files,
         host=args.host,
