@@ -26,12 +26,9 @@ from .list import (
     list_plugins,
     list_attacks,
 )
-<<<<<<< HEAD
-from .viewers.result_viewer import run_result_viewer
-=======
-from .result_viewer import run_result_viewer
->>>>>>> d58c8ef31b313c54a01956c4f3765595fa05d25c
 
+from .viewers.result_viewer import run_result_viewer
+from .viewers.prompt_viewer import run_prompt_viewer
 
 banner = r"""
    _____ _____ _____ _  ________ ______
@@ -92,7 +89,7 @@ def main():
 
     subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
 
-    # === [INIT] Sub-command (NEW) ==============================================
+# region === [INIT] Sub-command (NEW) ==============================================
     parser_init = subparsers.add_parser(
         "init", help="Initialize a local SPIKEE workspace"
     )
@@ -112,8 +109,9 @@ def main():
         action="store_true",
         help="Include the built-in web viewer in the local workspace",
     )
+# endregion === [INIT] Sub-command ===============================================
 
-    # === [GENERATE] Sub-command ===============================================
+# region === [GENERATE] Sub-command ===============================================
     parser_generate = subparsers.add_parser("generate", help="Generate a dataset")
     subparsers_generate = parser_generate.add_subparsers(
         dest="generate_command", help="Generation sub-commands"
@@ -241,8 +239,9 @@ def main():
         default=None,
         help='Plugin-specific options as "plugin1:option1,option2;plugin2:option2"',
     )
+# endregion === [GENERATE] Sub-command ===============================================
 
-    # === [TEST] Sub-command ===================================================
+# region === [TEST] Sub-command ===================================================
     parser_test = subparsers.add_parser(
         "test", help="Test the dataset against a target"
     )
@@ -348,7 +347,9 @@ def main():
         help="Create new results file, do not attempt to resume",
     )
 
-    # === [RESULTS] Sub-command ================================================
+# endregion === [TEST] Sub-command ===================================================
+
+# region === [RESULTS] Sub-command ================================================
     parser_results = subparsers.add_parser("results", help="Analyze or convert results")
     subparsers_results = parser_results.add_subparsers(
         dest="results_command", help="Results sub-commands"
@@ -501,23 +502,41 @@ def main():
         "--tag", default=None, help="Include a tag at the end of the results filename"
     )
 
-    # --- result-viewer
-    parser_result_viewer = subparsers_results.add_parser(
-        "result-viewer", help="Launch a local result viewer, for results JSONL files"
+    # --- convert-to-excel
+    parser_convert_to_excel = subparsers_results.add_parser(
+        "convert-to-excel", help="Convert results JSONL file to Excel"
     )
-    parser_result_viewer.add_argument(
+    parser_convert_to_excel.add_argument(
+        "--result-file", type=str, required=True, help="Path to the results JSONL file"
+    )
+# endregion === [RESULTS] Sub-command ================================================
+
+# region === [VIEWER] Sub-command ===================================================
+    parser_viewer = subparsers.add_parser(
+        "viewer", help="Launch local web viewers"
+    )
+
+    parser_viewer.add_argument(
         "--host",
         type=str,
         default="127.0.0.1",
-        help="Host address for the result viewer (default: 127.0.0.1)",
+        help="Host address for the prompt viewer (default: 127.0.0.1)",
     )
-    parser_result_viewer.add_argument(
+    parser_viewer.add_argument(
         "-p",
         "--port",
         type=int,
         default=8080,
-        help="Port number for the result viewer (default: 8080)",
+        help="Port number for the prompt viewer (default: 8080)",
     )
+
+    subparsers_viewer = parser_viewer.add_subparsers(dest="viewer_command", help="Viewer sub-commands")
+
+    # results
+    parser_result_viewer = subparsers_viewer.add_parser(
+        "results", help="Launch a local result viewer, for results JSONL files"
+    )
+
     parser_result_viewer.add_argument(
         "--result-file",
         type=str,
@@ -536,15 +555,13 @@ def main():
         help="Allow AST parsing in the result viewer (use with caution)",
     )
 
-    # --- convert-to-excel
-    parser_convert_to_excel = subparsers_results.add_parser(
-        "convert-to-excel", help="Convert results JSONL file to Excel"
+    # prompt
+    parser_prompt_viewer = subparsers_viewer.add_parser(
+        "prompt", help="Launch a local prompt viewer, for manual prompt injection testing using targets, plugins and attacks."
     )
-    parser_convert_to_excel.add_argument(
-        "--result-file", type=str, required=True, help="Path to the results JSONL file"
-    )
+# endregion === [VIEWER] Sub-command ===================================================
 
-    # === [LIST] Sub-command ================================================
+# region === [LIST] Sub-command ================================================
     parser_list = subparsers.add_parser(
         "list", help="List seeds, datasets, targets, or plugins"
     )
@@ -568,6 +585,7 @@ def main():
         )
 
     args = convert_to_new_args(parser.parse_args())
+# endregion === [LIST] Sub-command ================================================
 
     # Print banner and info unless quiet mode is enabled
     if not getattr(args, "quiet", False):
@@ -588,8 +606,10 @@ def main():
             generate_plugin(args)
         else:
             generate_dataset(args)
+
     elif args.command == "test":
         test_dataset(args)
+
     elif args.command == "results":
         if args.results_command == "analyze":
             analyze_results(args)
@@ -599,12 +619,11 @@ def main():
             extract_results(args)
         elif args.results_command == "dataset-comparison":
             dataset_comparison(args)
-        elif args.results_command == "result-viewer":
-            run_result_viewer(args)
         elif args.results_command == "convert-to-excel":
             convert_results_to_excel(args)
         else:
             parser_results.print_help()
+
     elif args.command == "list":
         if args.list_command == "seeds":
             list_seeds(args)
@@ -620,6 +639,14 @@ def main():
             list_attacks(args)
         else:
             parser_list.print_help()
+
+    elif args.command == "viewer":
+        if args.viewer_command == "results":
+            run_result_viewer(args)
+        elif args.viewer_command == "prompt":
+            run_prompt_viewer(args)
+        else:
+            parser_viewer.print_help()
     else:
         parser.print_help()
         sys.exit(1)
