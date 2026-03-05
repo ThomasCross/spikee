@@ -9,7 +9,7 @@ from . import __version__
 from dotenv import load_dotenv
 from pathlib import Path
 
-from .generator import generate_dataset, generate_plugin
+from .generator import generate_dataset
 from .tester import test_dataset
 from .results import (
     analyze_results,
@@ -559,6 +559,19 @@ def main():
     parser_prompt_viewer = subparsers_viewer.add_parser(
         "prompt", help="Launch a local prompt viewer, for manual prompt injection testing using targets, plugins and attacks."
     )
+    parser_prompt_viewer.add_argument(
+        "--target",
+        type=str,
+        required=True,
+        help="Name of the target to test (in local or built-in targets/ dir)",
+    )
+    parser_prompt_viewer.add_argument(
+        "--target-options",
+        type=str,
+        required=False,
+        help="Option to pass to the target [Optional]",
+    )
+
 # endregion === [VIEWER] Sub-command ===================================================
 
 # region === [LIST] Sub-command ================================================
