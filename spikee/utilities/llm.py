@@ -1,7 +1,8 @@
 from typing import Dict, List
-
 import os
+import json
 
+# region Models + Prefixes
 EXAMPLE_LLM_MODELS = [
     "openai-gpt-4.1-mini",
     "openai-gpt-4o",
@@ -39,6 +40,9 @@ def get_supported_llm_models() -> List[str]:
 def get_supported_prefixes() -> List[str]:
     """Return the list of supported LLM model prefixes."""
     return SUPPORTED_PREFIXES
+# endregion
+
+# region TogetherAI
 
 
 # Map of shorthand keys to TogetherAI model identifiers
@@ -69,6 +73,94 @@ def _resolve_togetherai_model(key: str) -> str:
         valid = ", ".join(TOGETHER_AI_MODEL_MAP.keys())
         raise ValueError(f"Unknown model key '{key}'. Valid keys: {valid}")
     return TOGETHER_AI_MODEL_MAP[key]
+# endregion
+
+
+class LLMWrapper():
+    """
+    A wrapper class for LLM instances that provides a consistent interface and can be extended with additional functionality.
+    """
+
+    def __init__(self, model_name, llm_instance):
+        self.model_name = model_name
+        self.llm = llm_instance
+
+        # Set up billing tracking
+        self.__billing_path = os.path.join(os.getcwd(), "billing.json")
+        self.__billing = self.__read_billing()
+
+        if self.__billing is not None and self.model_name in self.__billing['models']:
+            self.__input_costs = self.__billing['models'][self.model_name].get('input_cost', 0)
+            self.__output_costs = self.__billing['models'][self.model_name].get('output_cost', 0)
+        else:
+            self.__billing = None
+
+    def invoke(self, messages):
+        if self.llm is None:
+            raise ValueError("LLM instance is not initialized.")
+
+        response = self.llm.invoke(messages)
+
+        # Update billing information if available
+        if self.__billing is not None:
+            if self.model_name.startswith("bedrock-"):
+                usage = response.additional_kwargs.get("usage", {})
+                input_tokens = usage.get("prompt_tokens", 0)
+                output_tokens = usage.get("completion_tokens", 0)
+
+            elif self.model_name.startswith("bedrockcv-"):
+                input_tokens = response.usage_metadata.get("input_tokens", 0)
+                output_tokens = response.usage_metadata.get("output_tokens", 0)
+
+            elif self.model_name.startswith("google-"):
+                input_tokens = response.usage_metadata.get("input_tokens", 0)
+                output_tokens = response.usage_metadata.get("output_tokens", 0)
+
+            elif self.model_name.startswith("openai-"):
+                usage = response.response_metadata.get("token_usage", {})
+                input_tokens = usage.get("prompt_tokens", 0)
+                output_tokens = usage.get("completion_tokens", 0)
+
+            else:
+                return response
+
+            self.__update_billing(input_tokens, output_tokens)
+
+        return response
+
+    def __read_billing(self):
+        """Used to initially read billing costs."""
+        if not os.path.exists(self.__billing_path):
+            return None
+
+        with open(self.__billing_path, "r", encoding="utf-8") as f:
+            billing_data = json.load(f)
+
+        return billing_data
+
+    def __update_billing(self, input_tokens, output_tokens):
+        """Used to update billing costs after each LLM invocation."""
+        with open(self.__billing_path, "r+", encoding="utf-8") as f:
+            self.__billing = json.load(f)
+
+            input_cost = input_tokens * self.__input_costs
+            output_cost = output_tokens * self.__output_costs
+            cost = (input_cost + output_cost) / 1000000
+
+            print(f"Cost: ${cost:.8f}, Input: {input_tokens}, Output: {output_tokens}")
+
+            self.__billing['models'][self.model_name]['input_tokens'] = (
+                self.__billing['models'][self.model_name].get('input_tokens', 0) + input_tokens
+            )
+            self.__billing['models'][self.model_name]['output_tokens'] = (
+                self.__billing['models'][self.model_name].get('output_tokens', 0) + output_tokens
+            )
+
+            self.__billing['total_cost'] = cost + self.__billing.get('total_cost', 0)
+
+            f.seek(0)
+            f.truncate()
+            f.write(json.dumps(self.__billing, indent=2))
 
 
 def validate_llm_option(option: str) -> bool:
@@ -85,7 +177,7 @@ def validate_llm_option(option: str) -> bool:
     )
 
 
-def get_llm(options=None, max_tokens=8, temperature=0):
+def get_llm(options=None, max_tokens=8, temperature=0) -> LLMWrapper:
     """
     Initialize and return the appropriate LLM based on options.
 
@@ -104,35 +196,43 @@ def get_llm(options=None, max_tokens=8, temperature=0):
         from langchain_openai import ChatOpenAI
 
         model_name = options.replace("openai-", "")
-        return ChatOpenAI(
-            model=model_name,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            timeout=None,
-            max_retries=2,
+        return LLMWrapper(
+            options,
+            ChatOpenAI(
+                model=model_name,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=None,
+                max_retries=2,
+            )
         )
 
     elif options.startswith("google-"):
         from langchain_google_genai import ChatGoogleGenerativeAI
 
         model_name = options.replace("google-", "")
-        return ChatGoogleGenerativeAI(
-            transport="rest",
-            model=model_name,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            timeout=None,
-            max_retries=2,
+        return LLMWrapper(
+            options,
+            ChatGoogleGenerativeAI(
+                model=model_name,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=None,
+                max_retries=2,
+            )
         )
 
     elif options.startswith("bedrock-"):
         from langchain_aws import ChatBedrock
 
         model_name = options.replace("bedrock-", "")
-        return ChatBedrock(
-            model=model_name,
-            max_tokens=max_tokens,
-            temperature=temperature
+        return LLMWrapper(
+            options,
+            ChatBedrock(
+                model=model_name,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
         )
 
     elif options.startswith("bedrockcv-"):
@@ -142,32 +242,38 @@ def get_llm(options=None, max_tokens=8, temperature=0):
             max_tokens = 8192  # Set a high default if None is provided
 
         model_name = options.replace("bedrockcv-", "")
-        return ChatBedrockConverse(
-            model=model_name,
-            max_tokens=max_tokens,
-            temperature=temperature
+        return LLMWrapper(
+            options,
+            ChatBedrockConverse(
+                model=model_name,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
         )
 
     elif options.startswith("ollama-"):
         from langchain_ollama import ChatOllama
 
         model_name = options.replace("ollama-", "")
-        return ChatOllama(
-            model=model_name,
-            num_predict=max_tokens,  # maximum number of tokens to predict
-            temperature=temperature,
-            client_kwargs={
-                "timeout": float(os.environ["OLLAMA_TIMEOUT"])
-                if os.environ.get("OLLAMA_TIMEOUT") not in (None, "")
-                else None
-            },
-            # timeout in seconds (None = not configured)
-        ).with_retry(
-            stop_after_attempt=int(os.environ["OLLAMA_MAX_ATTEMPTS"])
-            if os.environ.get("OLLAMA_MAX_ATTEMPTS") not in (None, "")
-            else 1,
-            # total attempts (1 initial + retries)
-            wait_exponential_jitter=True,  # backoff with jitter
+        return LLMWrapper(
+            options,
+            ChatOllama(
+                model=model_name,
+                num_predict=max_tokens,  # maximum number of tokens to predict
+                temperature=temperature,
+                client_kwargs={
+                    "timeout": float(os.environ["OLLAMA_TIMEOUT"])
+                    if os.environ.get("OLLAMA_TIMEOUT") not in (None, "")
+                    else None
+                },
+                # timeout in seconds (None = not configured)
+            ).with_retry(
+                stop_after_attempt=int(os.environ["OLLAMA_MAX_ATTEMPTS"])
+                if os.environ.get("OLLAMA_MAX_ATTEMPTS") not in (None, "")
+                else 1,
+                # total attempts (1 initial + retries)
+                wait_exponential_jitter=True,  # backoff with jitter
+            )
         )
 
     elif options.startswith("llamaccp-server"):
@@ -184,12 +290,15 @@ def get_llm(options=None, max_tokens=8, temperature=0):
                     f"Invalid port in options: '{options}'. Expected format 'llamaccp-server-[port]', for example 'llamaccp-server-8080'."
                 ) from e
 
-        return ChatOpenAI(
-            base_url=url,
-            api_key="abc",
-            max_tokens=None,
-            timeout=None,
-            max_retries=2,
+        return LLMWrapper(
+            options,
+            ChatOpenAI(
+                base_url=url,
+                api_key="abc",
+                max_tokens=None,
+                timeout=None,
+                max_retries=2,
+            )
         )
 
     elif options.startswith("together"):
@@ -200,14 +309,17 @@ def get_llm(options=None, max_tokens=8, temperature=0):
         key = model_name_key if options is not None else DEFAULT_TOGETHER_AI_KEY
         model_name = _resolve_togetherai_model(key)
 
-        return ChatOpenAI(
-            base_url="https://api.together.xyz/v1",
-            api_key=os.environ.get("TOGETHER_API_KEY"),
-            model=model_name,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            timeout=None,
-            max_retries=2,
+        return LLMWrapper(
+            options,
+            ChatOpenAI(
+                base_url="https://api.together.xyz/v1",
+                api_key=os.environ.get("TOGETHER_API_KEY"),
+                model=model_name,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=None,
+                max_retries=2,
+            )
         )
 
     elif options.startswith("offline"):
@@ -259,3 +371,15 @@ class MockLLM:
         print("--------------------------------")
 
         return response
+
+
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+
+    load_dotenv()  # Load environment variables from .env file
+
+    llm = get_llm("bedrock-us.anthropic.claude-3-7-sonnet-20250219-v1:0", max_tokens=20)
+
+    response = llm.invoke([{"role": "user", "content": "Say Hi."}])
+
+    print("Final Response:", response)

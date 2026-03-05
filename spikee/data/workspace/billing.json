@@ -1,0 +1,61 @@
+{
+  "total_cost": 0,
+  "models": {
+    "bedrock-us.anthropic.claude-3-7-sonnet-20250219-v1:0": {
+      "update_notes": "2026-03-05 | us-east-2",
+      "input_cost": 3.0,
+      "output_cost": 15.0,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    "bedrock-global.anthropic.claude-opus-4-5-20251101-v1:0": {
+      "update_notes": "2026-03-05 | global",
+      "input_cost": 5.0,
+      "output_cost": 25.0,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    "bedrock-us.anthropic.claude-haiku-4-5-20251001-v1:0": {
+      "update_notes": "2026-03-05 | global",
+      "input_cost": 1.0,
+      "output_cost": 5.0,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    "bedrockcv-deepseek.v3-v1:0": {
+      "update_notes": "2026-03-05 | us-east-2",
+      "input_cost": 0.58,
+      "output_cost": 1.68,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    "bedrockcv-qwen.qwen3-coder-30b-a3b-v1:0": {
+      "update_notes": "2026-03-05 | us-east-2",
+      "input_cost": 0.15,
+      "output_cost": 0.6,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    "google-gemini-2.5-pro": {
+      "update_notes": "2026-03-05",
+      "input_cost": 1.25,
+      "output_cost": 10.0,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    "google-gemini-2.5-flash": {
+      "update_notes": "2026-03-05",
+      "input_cost": 0.3,
+      "output_cost": 2.5,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    "openai-gpt-4o": {
+      "update_notes": "2026-03-05",
+      "input_cost": 2.5,
+      "output_cost": 10.0,
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  }
+}
