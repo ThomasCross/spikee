@@ -147,8 +147,6 @@ class LLMWrapper():
             output_cost = output_tokens * self.__output_costs
             cost = (input_cost + output_cost) / 1000000
 
-            print(f"Cost: ${cost:.8f}, Input: {input_tokens}, Output: {output_tokens}")
-
             self.__billing['models'][self.model_name]['input_tokens'] = (
                 self.__billing['models'][self.model_name].get('input_tokens', 0) + input_tokens
             )
