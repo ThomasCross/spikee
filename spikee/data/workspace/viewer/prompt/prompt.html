@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="content" class="container">
+    <div class="row justify-content-center">
+        <div class="col-12 d-flex flex-column">
+            <div class="d-flex justify-content-between gap-2">
+                <div class="d-flex flex-column">
+                    <div class="d-flex gap-2 align-items-center"><h5>Target: <strong>{{ get_target() }}</strong></h5></div>
+                    <small class="text-muted">Options: {{ get_target_options() }}</small>
+                    <small class="text-muted">Log: {{ get_log() }}</small>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <label for="attempts" class="mb-0">Attempts:</label>
+                    <input type="number" id="attempts" name="attempts" class="form-control" style="max-width: 100px;" value="5" min="1">
+
+                    <label for="retries" class="mb-0">Retries:</label>
+                    <input type="number" id="retries" name="retries" class="form-control" style="max-width: 100px;" value="3" min="1">
+
+                    <button type="button" class="btn btn-primary w-auto" onclick="run()">Run</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-3">
+            <div class="card mt-3 p-2">
+                <h5 class="mb-1">Prefix</h5>
+
+                <input type="text" class="form-control mb-2" id="prefix" placeholder="prefix" value="">
+
+                <hr>
+
+                <input type="text" class="form-control mb-2" id="prefix-plugins" placeholder="plugins" value="">
+
+                <input type="text" id="prefix-plugin-options" class="form-control" placeholder="options">
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6">
+            <div class="card mt-3 p-2">
+                <h5 class="mb-1">Prompt</h5>
+                <input type="text" class="form-control mb-2" id="input" placeholder="user prompts" value="">
+
+                <hr>
+
+                <input type="text" class="form-control mb-2" id="input-plugins" placeholder="plugins" value="">
+
+                <input type="text" id="input-plugin-options" class="form-control" placeholder="options">
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-3">
+            <div class="card mt-3 p-2">
+                <h5 class="mb-1">Suffix</h5>
+                <input type="text" class="form-control mb-2" id="suffix" placeholder="Suffix" value="">
+
+                <hr>
+
+                <input type="text" class="form-control mb-2" id="suffix-plugins" placeholder="plugins" value="">
+
+                <input type="text" id="suffix-plugin-options" class="form-control" placeholder="options">
+            </div>
+        </div>
+    </div>
+    <div class="row justify-content-center">
+        <div class="col-12">
+            <small class="text-muted">Plugin options format: best_of_n:variants=5</small>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-12">
+            <div class="card mt-3 p-2">
+                <h5 class="mb-1">Responses</h5>
+                <pre id="output" class="mb-0" style="height: 300px; overflow-y: auto;"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function callApi(action, data) {
+        const options = {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        };
+        if (data !== null) {
+            options.body = JSON.stringify(data);
+        }
+        return fetch(`/api/${action}`, options)
+            .then(response => response.json())
+            .then(data => {
+                console.log('Success:', data);
+                return data;
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                throw error;
+            });
+    }
+
+    function run(){
+
+    }
+</script>
+{% endblock %}

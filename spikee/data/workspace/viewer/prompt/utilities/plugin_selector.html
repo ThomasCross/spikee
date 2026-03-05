@@ -1,0 +1,127 @@
+<div class="d-flex mt-2">
+    <div class="card flex-grow-1">
+        {% if pos == "global" %}
+        <div class="card-header">
+            <h5 class="mb-0">Global Plugins</h5>
+            <small class="text-muted">These plugins will be applied to the resulting prompt.</small>
+        </div>
+        {% else %}
+        <div class="card-header">
+            <h5 class="mb-0">Prompt #{{ pos }}</h5>
+        </div>
+        {% endif %}
+
+        <div class="card-body">
+            {% if pos != "global" %}
+            <div class="mb-3">
+                <input type="text" id="prompt-{{ pos }}" name="prompt-{{ pos }}" class="form-control" placeholder="Prompt" onchange="callApi('update_prompt/{{ pos }}', {text: this.value})">
+            </div>  
+            {% endif %}
+
+            <div class="mb-3">
+                <div class="input-group position-relative">
+                    <div id="selected-plugins-inline-{{pos}}"
+                        class="d-flex flex-wrap gap-2 p-2 flex-grow-1 border rounded-start"
+                        style="background-color: #f8f9fa; align-content: flex-start;">
+                        <input type="text" id="plugin-search-{{pos}}" class="form-control border-0"
+                            placeholder="Type to search plugins..." style="flex: 1; min-width: 150px;">
+                    </div>
+                    <div id="plugin-dropdown-{{pos}}" class="list-group position-absolute"
+                        style="display: none; top: 100%; left: 0; right: 0; z-index: 1000; max-height: 200px; overflow-y: auto;">
+                    </div>
+                </div>
+            </div>
+            <div class="mb-3">
+                {% if pos == "global" %}
+                <input type="text" id="plugin-options-{{pos}}" name="plugin-options" class="form-control"
+                    placeholder="--plugin-options (e.g., best_of_n:variants=5)" onchange="callApi('update_global_plugins', {plugin_options: this.value})">
+                {% else %}
+                <input type="text" id="plugin-options-{{pos}}" name="plugin-options" class="form-control"
+                    placeholder="--plugin-options (e.g., best_of_n:variants=5)" onchange="callApi('update_prompt/{{ pos }}', {plugin_options: this.value})">
+                {% endif %}
+            </div>
+
+            <input type="hidden" id="plugin-order-{{pos}}" name="plugin-order" value="">
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const searchInput = document.getElementById('plugin-search-{{pos}}');
+            const dropdown = document.getElementById('plugin-dropdown-{{pos}}');
+            const selectedPluginsInline = document.getElementById('selected-plugins-inline-{{pos}}');
+            const pluginOrderInput = document.getElementById('plugin-order-{{pos}}');
+
+            const allPlugins = [{% for plugin in get_plugins() %}'{{ plugin }}', {% endfor %}];
+        let draggedElement = null;
+
+        searchInput.addEventListener('input', function () {
+            const searchTerm = this.value.toLowerCase();
+            dropdown.innerHTML = '';
+
+            if (searchTerm.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            const filtered = allPlugins.filter(plugin =>
+                plugin.toLowerCase().includes(searchTerm) &&
+                !Array.from(selectedPluginsInline.querySelectorAll('[data-plugin]')).some(el => el.dataset.plugin === plugin)
+            );
+
+            if (filtered.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            filtered.forEach(plugin => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'list-group-item list-group-item-action';
+                item.textContent = plugin;
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    addPlugin(plugin);
+                    searchInput.value = '';
+                    dropdown.style.display = 'none';
+                    searchInput.focus();
+                });
+                dropdown.appendChild(item);
+            });
+
+            dropdown.style.display = 'block';
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target !== searchInput && !dropdown.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        function addPlugin(pluginName) {
+            const badge = document.createElement('div');
+            badge.className = 'badge bg-primary';
+            badge.style.cssText = 'padding: 6px 10px; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;';
+            badge.dataset.plugin = pluginName;
+            badge.innerHTML = `${pluginName} <button type="button" class="btn-close btn-close-white" style="padding: 0; cursor: pointer; font-size: 0.7rem;"></button>`;
+
+            badge.querySelector('.btn-close').addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                badge.remove();
+                updatePluginOrder();
+            });
+
+            selectedPluginsInline.insertBefore(badge, searchInput);
+            updatePluginOrder();
+        }
+
+        function updatePluginOrder() {
+            const plugins = Array.from(selectedPluginsInline.querySelectorAll('[data-plugin]')).map(el => el.dataset.plugin);
+            pluginOrderInput.value = plugins.join(',');
+
+            callApi('{{ "update_global_plugins" if pos == "global" else "update_prompt/" + pos }}', {plugins: plugins});
+        }
+                });
+    </script>
+</div>
