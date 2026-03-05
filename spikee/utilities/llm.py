@@ -371,15 +371,3 @@ class MockLLM:
         print("--------------------------------")
 
         return response
-
-
-if __name__ == "__main__":
-    from dotenv import load_dotenv
-
-    load_dotenv()  # Load environment variables from .env file
-
-    llm = get_llm("bedrock-us.anthropic.claude-3-7-sonnet-20250219-v1:0", max_tokens=20)
-
-    response = llm.invoke([{"role": "user", "content": "Say Hi."}])
-
-    print("Final Response:", response)
