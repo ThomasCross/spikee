@@ -24,11 +24,11 @@ VIEWER_NAME = "SPIKEE | Result Viewer"
 TRUNCATE_LENGTH = 500
 
 
-def create_result_viewer(viewer_folder, results_files, host, port, allow_ast=False) -> Flask:
+def create_result_viewer(viewer_folder, results_files, allow_ast=False) -> Flask:
     viewer = Flask(
         VIEWER_NAME,
         static_folder=os.path.join(viewer_folder, "static"),
-        template_folder=os.path.join(viewer_folder, "templates"),
+        template_folder=os.path.join(viewer_folder, "results"),
     )
 
     # Suppress Flask logging
@@ -397,8 +397,6 @@ def run_result_viewer(args):
     viewer = create_result_viewer(
         viewer_folder=viewer_folder,
         results_files=results_files,
-        host=args.host,
-        port=args.port,
         allow_ast=args.allow_ast,
     )
 

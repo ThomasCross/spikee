@@ -73,6 +73,8 @@ class Module:
     tags: List[ModuleTag] = None
     description: str = ""
 
+    module: object = None
+
 
 def _load_module(name, path: Path):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -115,8 +117,10 @@ def _collect_local(module_type: str):
                 tags = []
                 description = ""
 
+                mod = None
+
             entries.append(
-                Module(name, opts, util_llm, tags, description)
+                Module(name, opts, util_llm, tags, description, mod)
             )
             if util_llm:
                 any_util_llm = True
@@ -157,10 +161,10 @@ def _collect_builtin(pkg: str, module_type: str):
                 tags = []
                 description = ""
 
-                traceback.print_exc()
+                mod = None
 
             entries.append(
-                Module(name, opts, util_llm, tags, description)
+                Module(name, opts, util_llm, tags, description, mod)
             )
             if util_llm:
                 any_util_llm = True
@@ -217,6 +221,19 @@ Supported Prefixes: {", ".join(get_supported_prefixes())}
     builtin_tree = print_section(builtin_entries, "built-in")
     console.print(builtin_tree)
 
+# --- Helpers ---
+
+
+def collect(module_type: str):
+
+    local, _ = _collect_local(module_type)
+    builtin, _ = _collect_builtin(f"spikee.{module_type}", module_type)
+
+    modules = []  # name: module
+    for module in local + builtin:
+        modules.append(module.name)
+
+    return modules
 
 # --- Commands ---
 
