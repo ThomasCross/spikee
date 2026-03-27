@@ -177,7 +177,7 @@ def _render_section(title: str, local_entries, builtin_entries, util_llm: bool =
 The LLM options are available, using 'model=<option>':
 Supported Providers (use 'spikee list providers' for more): {", ".join(list_modules("providers"))} 
 """, style="yellow"
-        ))  # TODO: fix
+        ))
 
     def print_section(entries, label) -> Tree:
         tree = Tree(f"[bold]{title} ({label})[/bold]")
