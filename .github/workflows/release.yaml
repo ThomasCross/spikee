@@ -24,7 +24,7 @@ jobs:
 
   release:
     needs: tests
-    if: always() && (needs.tests.result == 'success' || github.event.inputs.skip_tests == 'true') && github.ref == 'refs/heads/main'
+    if: always() && (github.event.inputs.skip_tests == 'true' || needs.tests.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
