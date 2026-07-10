@@ -14,8 +14,7 @@ on:
         type: boolean
 
 permissions:
-  contents: write  # needed to push commit + tag
-  pull-requests: write  # needed to open the post-release dev-bump PR
+  contents: write  # needed to push commit + tag and bump develop
 
 jobs:
   tests:
@@ -241,18 +240,18 @@ jobs:
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
-      - name: Open dev-bump PR to develop
+      - name: Bump develop to next dev version
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           NEXT_DEV="${{ steps.bump.outputs.next_dev_version }}"
           export NEXT_DEV
-          BRANCH="chore/bump-${NEXT_DEV}"
 
-          # Fetch develop so we can branch from it
+          # Fetch and checkout develop directly
           git fetch origin develop
-          git checkout -b "${BRANCH}" origin/develop
+          git checkout develop
+          git pull origin develop
 
           python - <<EOF
           import toml, pathlib, re, os
@@ -286,10 +285,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add pyproject.toml spikee/__init__.py README.md
           git commit -m "chore: bump version to ${NEXT_DEV}"
-          git push origin "${BRANCH}"
-
-          gh pr create \
-            --base develop \
-            --head "${BRANCH}" \
-            --title "chore: bump version to ${NEXT_DEV}" \
-            --body "Automated post-release version bump from the release workflow."
+          git push origin develop
