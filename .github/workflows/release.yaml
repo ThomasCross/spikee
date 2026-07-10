@@ -247,6 +247,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           NEXT_DEV="${{ steps.bump.outputs.next_dev_version }}"
+          export NEXT_DEV
           BRANCH="chore/bump-${NEXT_DEV}"
 
           # Fetch develop so we can branch from it
@@ -254,25 +255,26 @@ jobs:
           git checkout -b "${BRANCH}" origin/develop
 
           python - <<EOF
-          import toml, pathlib, re
+          import toml, pathlib, re, os
+          next_dev = os.environ["NEXT_DEV"]
           root = pathlib.Path(".")
 
           # pyproject.toml
           pp = root / "pyproject.toml"
           data = toml.load(pp.open())
-          data["project"]["version"] = "${NEXT_DEV}"
+          data["project"]["version"] = next_dev
           pp.write_text(toml.dumps(data))
 
           # __init__.py
           initp = root / "spikee" / "__init__.py"
-          initp.write_text('__version__ = "${NEXT_DEV}"\n')
+          initp.write_text(f'__version__ = "{next_dev}"\n')
 
           # README.md
           readme = root / "README.md"
           if readme.exists():
               txt = readme.read_text()
               new_txt, n = re.subn(r"(_Version:\s*)(\d+\.\d+\.\d+(?:-dev)?)(\s*_)",
-                                   rf"\g<1>${NEXT_DEV}\3", txt, count=1)
+                                   rf"\g<1>{next_dev}\3", txt, count=1)
               if n:
                   readme.write_text(new_txt)
                   print("Updated README.md to next dev version.")
