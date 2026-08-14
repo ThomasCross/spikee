@@ -9,6 +9,10 @@
                href="/test/workshop">Target Workshop</a>
         </li>
         <li class="nav-item">
+            <a class="nav-link {% if active_test_page == 'manual' %}active{% endif %}"
+               href="/test/manual">Manual</a>
+        </li>
+        <li class="nav-item">
             <a class="nav-link {% if active_test_page == 'run' %}active{% endif %}"
                href="/test/run">Test</a>
         </li>

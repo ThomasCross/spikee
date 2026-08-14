@@ -44,11 +44,11 @@ CREATE TABLE IF NOT EXISTS jobs (
 @dataclass
 class Job:
     id: str
-    type: str  # "generate" | "test"
+    type: str  # "generate" | "test" | "manual"
     name: str  # human-readable label
     status: str  # "running" | "success" | "failed"
     created_at: datetime
-    args: list  # CLI args list (after "spikee --quiet")
+    args: object  # CLI args list OR dict for manual jobs
     log: list = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
     returncode: Optional[int] = None
@@ -127,15 +127,16 @@ class JobQueue:
             conn.commit()
 
     def _db_update(self, job: Job) -> None:
-        """Update status, log and returncode for an existing job row."""
+        """Update status, log, returncode and args for an existing job row."""
         with job.lock:
             status = job.status
             log_text = "\n".join(job.log)
             returncode = job.returncode
+            args_json = json.dumps(job.args)
         with self._connect() as conn:
             conn.execute(
-                "UPDATE jobs SET status=?, log=?, returncode=? WHERE id=?",
-                (status, log_text, returncode, job.id),
+                "UPDATE jobs SET status=?, log=?, returncode=?, args=? WHERE id=?",
+                (status, log_text, returncode, args_json, job.id),
             )
             conn.commit()
 
@@ -170,6 +171,28 @@ class JobQueue:
         """Return True if any job is currently in the 'running' state."""
         with self._lock:
             return any(j.status == "running" for j in self._jobs.values())
+
+    def update_job_args(self, job_id: str, args: object) -> None:
+        """Update a job's args in memory and persist to DB (used by manual jobs)."""
+        job = self.get(job_id)
+        if job is None:
+            return
+        with job.lock:
+            job.args = args
+        if self._db_path is not None:
+            self._db_update(job)
+
+    def finish_job(self, job_id: str) -> None:
+        """Mark a manual job as complete."""
+        job = self.get(job_id)
+        if job is None:
+            return
+        with job.lock:
+            job.status = "success"
+            job.returncode = 0
+            job.log.append("[Manual] Session complete.")
+        if self._db_path is not None:
+            self._db_update(job)
 
 
 def init_job_queue(db_path: Optional[str] = None) -> None:

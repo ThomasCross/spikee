@@ -79,11 +79,31 @@ def detail(job_id: str) -> str:
                 elif len(parts) == 2:  # results/file.jsonl
                     result_keys.append(extract_resource_name(parts[-1]))
 
+    # For manual jobs, derive progress and resume/results link from args
+    manual_meta = None
+    if job.type == "manual" and isinstance(job.args, dict):
+        output_file = job.args.get("output_file", "")
+        done = 0
+        try:
+            with open(output_file, encoding="utf-8") as _f:
+                done = sum(1 for ln in _f if ln.strip())
+        except OSError:
+            pass
+        rk = extract_resource_name(output_file)
+        manual_meta = {
+            "done": done,
+            "total": job.args.get("total", 0),
+            "dataset": job.args.get("dataset", ""),
+            "result_key": rk,
+            "judge_options": job.args.get("judge_options"),
+        }
+
     return render_template(
         "jobs/detail.html",
         job=job,
         dataset_filename=dataset_filename,
         result_keys=result_keys,
+        manual_meta=manual_meta,
     )
 
 
@@ -112,8 +132,11 @@ def rerun(job_id: str) -> Response:
     with original.lock:
         job_type = original.type
         job_name = original.name
-        job_args = list(original.args)
-    new_job = job_queue.create(type=job_type, name=job_name, args=job_args)
+        job_args = original.args
+    if job_type == "manual":
+        # Manual jobs cannot be re-run via subprocess
+        abort(400, description="Manual jobs cannot be re-run.")
+    new_job = job_queue.create(type=job_type, name=job_name, args=list(job_args))
     spawn_job(new_job)
     return redirect(url_for("jobs.detail", job_id=new_job.id))
 

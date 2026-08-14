@@ -31,6 +31,8 @@
 {% macro type_badge(type) %}
 {%- if type == 'generate' -%}
 <span class="badge bg-info text-dark">Generate</span>
+{%- elif type == 'manual' -%}
+<span class="badge bg-warning text-dark">Manual</span>
 {%- else -%}
 <span class="badge bg-primary">Test</span>
 {%- endif -%}

@@ -12,14 +12,31 @@
         <a href="/jobs" class="btn btn-sm btn-outline-secondary">&larr; All Jobs</a>
 
         {% if job.status == 'running' %}
+        {% if job.type == 'manual' %}
+        <form method="post" action="/test/manual/{{ job.id }}/finish" class="mb-0">
+            <button type="submit" class="btn btn-sm btn-warning"
+                    onclick="return confirm('Finish session early?')">Finish Early</button>
+        </form>
+        {% else %}
         <form method="post" action="/jobs/{{ job.id }}/cancel" class="mb-0">
             <button type="submit" class="btn btn-sm btn-danger"
                     onclick="return confirm('Cancel this job?')">Cancel</button>
         </form>
+        {% endif %}
         {% else %}
+        {% if job.type != 'manual' %}
         <form method="post" action="/jobs/{{ job.id }}/rerun" class="mb-0">
             <button type="submit" class="btn btn-sm btn-outline-secondary">Re-run</button>
         </form>
+        {% endif %}
+        {% endif %}
+
+        {% if manual_meta %}
+        <a href="/test/manual/{{ job.id }}" class="btn btn-sm btn-outline-primary">
+            {% if job.status == 'running' %}Resume{% else %}View Session{% endif %}
+        </a>
+        <a href="/results/overview?result_file={{ manual_meta.result_key | urlencode }}"
+           class="btn btn-sm btn-outline-success">View Results</a>
         {% endif %}
 
         {% if dataset_filename %}
@@ -64,15 +81,44 @@
                 </div>
                 {% endif %}
             </div>
-            {% if job.args %}
+            {% if job.args and job.type != 'manual' %}
             <div class="mt-2">
                 <div class="meta-label mb-1">Command</div>
                 <code class="small d-block" style="word-break:break-all;white-space:pre-wrap;">spikee {{ job.args | join(' ') }}</code>
+            </div>
+            {% elif job.type == 'manual' and manual_meta %}
+            <div class="mt-2">
+                <div class="meta-label mb-1">Dataset</div>
+                <code class="small">{{ manual_meta.dataset }}</code>
+                {% if manual_meta.judge_options %}
+                <span class="ms-3"><span class="meta-label">Judge Options:</span> <code class="small">{{ manual_meta.judge_options }}</code></span>
+                {% endif %}
             </div>
             {% endif %}
         </div>
     </div>
 
+    {# ── Progress panel for manual jobs / log panel for automated jobs ── #}
+    {% if job.type == 'manual' and manual_meta %}
+    <div class="card spikee-card">
+        <div class="card-header py-2 px-3 fw-semibold small">Progress</div>
+        <div class="card-body py-3 px-3">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+                <span>{{ manual_meta.done }} of {{ manual_meta.total }} entries processed</span>
+                <span>{{ ((manual_meta.done / [manual_meta.total, 1] | max) * 100) | round(0) | int }}%</span>
+            </div>
+            <div class="progress mb-3" style="height:8px">
+                <div class="progress-bar bg-success" role="progressbar"
+                     style="width:{{ ((manual_meta.done / [manual_meta.total, 1] | max) * 100) | round(0) | int }}%"></div>
+            </div>
+            {% if job.log %}
+            <div class="small font-monospace text-muted" style="max-height:160px;overflow-y:auto">
+                {% for line in job.log %}{{ line | e }}<br>{% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
     {# ── Log panel ── #}
     <div class="card spikee-card">
         <div class="card-header py-2 px-3 fw-semibold small d-flex align-items-center justify-content-between">
@@ -90,6 +136,7 @@
 {% endfor %}</pre>
         </div>
     </div>
+    {% endif %}
 
 </div>
 {% endblock %}

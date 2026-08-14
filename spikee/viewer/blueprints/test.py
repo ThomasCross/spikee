@@ -131,6 +131,22 @@ def attacks_list_partial() -> str:
     )
 
 
+@test_bp.route("/partials/judges-options")
+def judges_options_partial() -> str:
+    """HTMX partial — returns <option> elements for the judge <select>."""
+    if not _module_cache.is_type_ready("judges"):
+        return render_template(
+            "partials/_picker_loading.html",
+            target_id="judge",
+            poll_url="/test/partials/judges-options",
+            label="judges",
+        )
+    return render_template(
+        "partials/_judges_options.html",
+        judges=_collect_modules_for_target("judges"),
+    )
+
+
 @test_bp.route("/run", methods=["POST"])
 def run_post() -> Response:
     """Handle test form submission, create a job, and redirect to its detail page."""
@@ -400,3 +416,262 @@ def workshop_new_log() -> Response:
     session.pop("workshop_log_file", None)
     session.pop("workshop_log_count", None)
     return jsonify({"status": "ok"})
+
+
+# ── Manual Dataset Routes ──────────────────────────────────────────────────────
+
+
+def _count_file_lines(path: str) -> int:
+    """Count non-empty lines in a file without loading it into memory."""
+    count = 0
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                if line.strip():
+                    count += 1
+    except OSError:
+        pass
+    return count
+
+
+def _read_jsonl_entry_at(path: str, index: int) -> dict | None:
+    """Return the entry at *index* from a JSONL file without loading the whole file."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for i, line in enumerate(fh):
+                line = line.strip()
+                if not line:
+                    continue
+                if i == index:
+                    import json as _json
+                    return _json.loads(line)
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def _manual_result_key(output_file: str) -> str:
+    """Convert an absolute output_file path to a results-viewer key."""
+    from spikee.utilities.files import extract_resource_name
+    return extract_resource_name(output_file)
+
+
+@test_bp.route("/manual")
+def manual_start() -> str:
+    """Render the manual dataset session start page."""
+    from spikee.viewer.blueprints.generate import _collect_plugins_detail  # noqa: F401
+    return render_template(
+        "test/manual_start.html",
+        datasets=_collect_datasets(),
+    )
+
+
+@test_bp.route("/manual/start", methods=["POST"])
+def manual_start_post() -> Response:
+    """Create a manual job and redirect to the session page."""
+    import random as _random
+    from pathlib import Path
+    from spikee.utilities.files import build_file_name
+
+    dataset = (request.form.get("dataset") or "").strip()
+    judge_options = (request.form.get("judge_options") or "").strip() or None
+    tag = (request.form.get("tag") or "").strip() or None
+
+    sample_str = (request.form.get("sample") or "").strip()
+    sample: float | None = None
+    if sample_str:
+        try:
+            sv = float(sample_str)
+            if 0 < sv < 1:
+                sample = sv
+            else:
+                abort(400, description="Sample must be between 0 and 1.")
+        except ValueError:
+            abort(400, description="Sample must be a number.")
+
+    sample_seed_str = (request.form.get("sample_seed") or "42").strip()
+
+    if not dataset:
+        abort(400, description="No dataset selected.")
+
+    datasets_dir = os.path.join(os.getcwd(), "datasets")
+    dataset_path = os.path.normpath(os.path.join(datasets_dir, dataset))
+    if not dataset_path.startswith(os.path.normpath(datasets_dir)):
+        abort(400, description="Invalid dataset path.")
+    if not os.path.isfile(dataset_path):
+        abort(400, description=f"Dataset '{dataset}' not found.")
+
+    total_lines = _count_file_lines(dataset_path)
+    if total_lines == 0:
+        abort(400, description="Dataset is empty.")
+
+    # Compute the ordered list of dataset line indices to process.
+    if sample is not None:
+        seed = _random.randint(0, 2**32 - 1) if sample_seed_str == "random" else int(sample_seed_str)
+        _random.seed(seed)
+        size = round(total_lines * sample)
+        entry_indices = sorted(_random.sample(range(total_lines), size))
+    else:
+        entry_indices = None  # None means "all in order" — avoids storing a huge list
+
+    total = len(entry_indices) if entry_indices is not None else total_lines
+
+    filename = build_file_name("results", "manual", os.path.splitext(dataset)[0].replace("/", "_").replace("\\", "_"), tag)
+    results_dir = os.path.join(os.getcwd(), "results")
+    os.makedirs(results_dir, exist_ok=True)
+    output_file = os.path.join(results_dir, filename)
+    Path(output_file).touch()
+
+    job_name = f"Manual: {dataset}"
+    if tag:
+        job_name += f" [{tag}]"
+
+    job = job_queue.create(
+        type="manual",
+        name=job_name,
+        args={
+            "dataset": dataset,
+            "dataset_path": dataset_path,
+            "total": total,
+            "output_file": output_file,
+            "judge_options": judge_options,
+            "entry_indices": entry_indices,
+            "tag": tag,
+        },
+    )
+    return redirect(url_for("test.manual_session", job_id=job.id))
+
+
+@test_bp.route("/manual/<job_id>")
+def manual_session(job_id: str) -> Response | str:
+    """Render the current entry for a manual testing session."""
+    job = job_queue.get(job_id)
+    if job is None or job.type != "manual":
+        abort(404)
+
+    meta = job.args
+    index = _count_file_lines(meta["output_file"])
+
+    if index >= meta["total"]:
+        return redirect(url_for("test.manual_complete", job_id=job_id))
+
+    entry_indices = meta.get("entry_indices")
+    line_index = entry_indices[index] if entry_indices is not None else index
+    entry = _read_jsonl_entry_at(meta["dataset_path"], line_index)
+    if entry is None:
+        abort(500, description="Could not read dataset entry.")
+
+    content = entry.get("content") or entry.get("text") or ""
+    content_type = entry.get("content_type", "text")
+
+    return render_template(
+        "test/manual_entry.html",
+        job=job,
+        entry=entry,
+        content=content,
+        content_type=content_type,
+        index=index,
+        total=meta["total"],
+        judge_name=entry.get("judge_name", "canary"),
+        judge_args=entry.get("judge_args", ""),
+        judge_options=meta.get("judge_options"),
+        output_file=meta["output_file"],
+    )
+
+
+@test_bp.route("/manual/<job_id>", methods=["POST"])
+def manual_session_post(job_id: str) -> Response:
+    """Save the current entry's response and advance to the next."""
+    import json as _json
+    import time as _time
+    from spikee.utilities.files import append_jsonl_entry
+    from spikee.judge import call_judge, annotate_judge_options
+
+    job = job_queue.get(job_id)
+    if job is None or job.type != "manual":
+        abort(404)
+
+    meta = job.args
+    index = _count_file_lines(meta["output_file"])
+
+    if index >= meta["total"]:
+        return redirect(url_for("test.manual_complete", job_id=job_id))
+
+    outcome = request.form.get("outcome", "submitted")
+    response_text = (request.form.get("response_text") or "").strip() or None
+    override = request.form.get("override") == "true"
+    override_success = request.form.get("override_success")
+
+    entry_indices = meta.get("entry_indices")
+    line_index = entry_indices[index] if entry_indices is not None else index
+    entry = _read_jsonl_entry_at(meta["dataset_path"], line_index)
+    if entry is None:
+        abort(500, description="Could not read dataset entry.")
+
+    success = None
+    if outcome == "submitted" and response_text:
+        if override and override_success is not None:
+            success = override_success == "true"
+        else:
+            # Use the entry's own judge, optionally with session-level judge_options.
+            try:
+                annotated = annotate_judge_options([entry], meta.get("judge_options"))[0]
+                success = bool(call_judge(annotated, response_text))
+            except Exception:
+                pass
+
+    result_entry = {
+        **entry,
+        "response": response_text,
+        "success": success,
+        "outcome": outcome,
+        "timestamp": int(_time.time()),
+    }
+    append_jsonl_entry(meta["output_file"], result_entry, _log_lock)
+
+    label = f"[{index + 1}/{meta['total']}] {outcome}"
+    if success is not None:
+        label += f" ({'pass' if success else 'fail'})"
+    with job.lock:
+        job.log.append(label)
+
+    next_index = index + 1
+    if next_index >= meta["total"]:
+        job_queue.finish_job(job_id)
+        return redirect(url_for("test.manual_complete", job_id=job_id))
+
+    return redirect(url_for("test.manual_session", job_id=job_id))
+
+
+@test_bp.route("/manual/<job_id>/finish", methods=["POST"])
+def manual_finish(job_id: str) -> Response:
+    """Finish the manual session early."""
+    job = job_queue.get(job_id)
+    if job is None or job.type != "manual":
+        abort(404)
+    job_queue.finish_job(job_id)
+    return redirect(url_for("test.manual_complete", job_id=job_id))
+
+
+@test_bp.route("/manual/<job_id>/complete")
+def manual_complete(job_id: str) -> str:
+    """Render the manual session completion summary."""
+    job = job_queue.get(job_id)
+    if job is None or job.type != "manual":
+        abort(404)
+
+    meta = job.args
+    done = _count_file_lines(meta["output_file"])
+    submitted = sum(1 for line in job.log if "submitted" in line)
+    skipped = sum(1 for line in job.log if "skipped" in line)
+    result_key = _manual_result_key(meta["output_file"])
+
+    return render_template(
+        "test/manual_complete.html",
+        job=job,
+        total=meta["total"],
+        done=done,
+        submitted=submitted,
+        skipped=skipped,
+        result_key=result_key,
+    )
