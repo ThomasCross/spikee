@@ -36,6 +36,7 @@
                         <label class="form-label small fw-semibold" for="target_options">Target Options</label>
                         <input type="text" class="form-control form-control-sm font-monospace"
                                id="target_options" name="target_options"
+                               value="{{ saved.get('target_options', '') }}"
                                placeholder="model=openai/gpt-4o">
                         <div class="form-text">e.g. <code>model=openai/gpt-4o</code>, <code>temperature=0</code></div>
                     </div>
@@ -50,7 +51,8 @@
                                 {% for ds in datasets %}
                                 <div class="form-check mb-1">
                                     <input class="form-check-input dataset-cb" type="checkbox"
-                                           name="datasets" value="{{ ds }}" id="ds_{{ loop.index }}">
+                                           name="datasets" value="{{ ds }}" id="ds_{{ loop.index }}"
+                                           {% if ds in saved.get('datasets', []) %}checked{% endif %}>
                                     <label class="form-check-label small font-monospace" for="ds_{{ loop.index }}">
                                         {{ ds }}
                                     </label>
@@ -70,7 +72,9 @@
                     <div class="col-12 col-md-12">
                         <label class="form-label small fw-semibold" for="judge_options">Judge Options</label>
                         <input type="text" class="form-control form-control-sm font-monospace"
-                               id="judge_options" name="judge_options" placeholder="offline">
+                               id="judge_options" name="judge_options"
+                               value="{{ saved.get('judge_options', '') }}"
+                               placeholder="offline">
                         <div class="form-text">e.g. <code>offline</code>, <code>model=bedrock/claude45-haiku</code></div>
                     </div>
                 </div>
@@ -89,7 +93,7 @@
                         <div class="input-group input-group-sm">
                             <input type="number" class="form-control font-monospace"
                                    id="sample" name="sample" min="0.01" max="0.99"
-                                   step="0.01" placeholder="1.0 (all)">
+                                   step="0.01" value="{{ saved.get('sample', '') }}" placeholder="1.0 (all)">
                             <span class="input-group-text">0–1</span>
                         </div>
                         <div class="form-text">Fraction of dataset to test.</div>
@@ -97,14 +101,15 @@
                     <div class="col-12 col-sm-6 col-lg-3">
                         <label class="form-label small fw-semibold" for="sample_seed">Sample Seed</label>
                         <input type="text" class="form-control form-control-sm font-monospace"
-                               id="sample_seed" name="sample_seed" value="42" placeholder="42 or random">
+                               id="sample_seed" name="sample_seed"
+                               value="{{ saved.get('sample_seed', '42') }}" placeholder="42 or random">
                         <div class="form-text">Reproducibility seed.</div>
                     </div>
                     <div class="col-12 col-sm-6 col-lg-3">
                         <label class="form-label small fw-semibold">Resume Behaviour</label>
                         <select class="form-select form-select-sm" id="resume" name="resume">
-                            <option value="no" selected>Start fresh</option>
-                            <option value="auto">Auto-resume latest</option>
+                            <option value="no" {% if saved.get('resume','no')=='no' %}selected{% endif %}>Start fresh</option>
+                            <option value="auto" {% if saved.get('resume')=='auto' %}selected{% endif %}>Auto-resume latest</option>
                         </select>
                         <div class="form-text">How to handle existing results files.</div>
                     </div>
@@ -128,25 +133,25 @@
                     <div class="col-6 col-sm-3">
                         <label class="form-label small fw-semibold" for="threads">Threads</label>
                         <input type="number" class="form-control form-control-sm"
-                               id="threads" name="threads" min="1" max="64" value="4">
+                               id="threads" name="threads" min="1" max="64" value="{{ saved.get('threads', '4') }}">
                         <div class="form-text">Parallel workers.</div>
                     </div>
                     <div class="col-6 col-sm-3">
                         <label class="form-label small fw-semibold" for="attempts">Attempts</label>
                         <input type="number" class="form-control form-control-sm"
-                               id="attempts" name="attempts" min="1" max="100" value="1">
+                               id="attempts" name="attempts" min="1" max="100" value="{{ saved.get('attempts', '1') }}">
                         <div class="form-text">Per-entry attempts.</div>
                     </div>
                     <div class="col-6 col-sm-3">
                         <label class="form-label small fw-semibold" for="max_retries">Max Retries</label>
                         <input type="number" class="form-control form-control-sm"
-                               id="max_retries" name="max_retries" min="0" max="20" value="3">
+                               id="max_retries" name="max_retries" min="0" max="20" value="{{ saved.get('max_retries', '3') }}">
                         <div class="form-text">On API errors.</div>
                     </div>
                     <div class="col-6 col-sm-3">
                         <label class="form-label small fw-semibold" for="throttle">Throttle (s)</label>
                         <input type="number" class="form-control form-control-sm"
-                               id="throttle" name="throttle" min="0" step="0.1" value="0">
+                               id="throttle" name="throttle" min="0" step="0.1" value="{{ saved.get('throttle', '0') }}">
                         <div class="form-text">Delay between requests.</div>
                     </div>
                 </div>
@@ -179,18 +184,21 @@
                         <div>
                             <label class="form-label small fw-semibold" for="attack_iterations">Iterations</label>
                             <input type="number" class="form-control form-control-sm"
-                                   id="attack_iterations" name="attack_iterations" min="1" value="10">
+                                   id="attack_iterations" name="attack_iterations" min="1"
+                                   value="{{ saved.get('attack_iterations', '10') }}">
                             <div class="form-text">Number of attack iterations.</div>
                         </div>
                         <div>
                             <label class="form-label small fw-semibold" for="attack_options">Attack Options</label>
                             <input type="text" class="form-control form-control-sm font-monospace"
-                                   id="attack_options" name="attack_options" placeholder="mode=aggressive">
+                                   id="attack_options" name="attack_options"
+                                   value="{{ saved.get('attack_options', '') }}" placeholder="mode=aggressive">
                             <div class="form-text">Key=value options passed to the attack module.</div>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox"
-                                   id="attack_only" name="attack_only">
+                                   id="attack_only" name="attack_only"
+                                   {% if saved.get('attack_only') %}checked{% endif %}>
                             <label class="form-check-label small" for="attack_only">Attack only — skip standard attempts, run attack directly</label>
                         </div>
                     </div>
@@ -207,12 +215,16 @@
                     onclick="document.querySelectorAll('.dataset-cb').forEach(cb=>cb.checked=false)">
                 Clear
             </button>
+            <button type="button" class="btn btn-outline-secondary ms-2" onclick="resetFormDefaults('test')">Reset Defaults</button>
         </div>
 
     </form>
 </div>
 
 <script>
+const _savedTarget = {{ saved.get('target', '') | tojson }};
+const _savedAttack = {{ saved.get('attack', '') | tojson }};
+
 function toggleAttackFields(val) {
     const el = document.getElementById('af-fields');
     el.style.display = val ? '' : 'none';
@@ -237,6 +249,37 @@ document.getElementById('attack-list').addEventListener('click', e => {
         toggleAttackFields('');
     }
 });
+
+// Restore saved target after HTMX loads the targets <select>.
+if (_savedTarget) {
+    document.getElementById('target').addEventListener('htmx:afterSwap', function _restoreTarget() {
+        document.getElementById('target').value = _savedTarget;
+        this.removeEventListener('htmx:afterSwap', _restoreTarget);
+    });
+}
+
+// Restore saved attack module after HTMX loads the attack list.
+if (_savedAttack) {
+    document.getElementById('attack-list').addEventListener('htmx:afterSwap', function _restoreAttack() {
+        const btn = document.querySelector(`.attack-picker-btn[data-attack="${_savedAttack}"]`);
+        if (btn) {
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-secondary');
+            document.getElementById('attack').value = _savedAttack;
+            toggleAttackFields(_savedAttack);
+        }
+        this.removeEventListener('htmx:afterSwap', _restoreAttack);
+    });
+}
+
+function resetFormDefaults(formName) {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    fetch('/settings/api/reset-form', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': meta ? meta.content : '' },
+        body: JSON.stringify({ form: formName })
+    }).then(() => location.reload());
+}
 
 function toggleAllDatasets(state) {
     document.querySelectorAll('.dataset-cb').forEach(cb => cb.checked = state);

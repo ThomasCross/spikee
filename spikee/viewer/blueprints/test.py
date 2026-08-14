@@ -97,6 +97,7 @@ def run() -> str:
     return render_template(
         "test/run.html",
         datasets=_collect_datasets(),
+        saved=session.get("test_settings", {}),
     )
 
 
@@ -155,6 +156,12 @@ def run_post() -> Response:
     except FormValidationError as exc:
         abort(400, description=str(exc))
         return  # unreachable; satisfies type checkers
+
+    # Persist form state for next visit (tag excluded — it's per-run)
+    _excluded = {"tag", "_csrf_token"}
+    saved: dict = {k: v for k, v in request.form.items() if k not in _excluded}
+    saved["datasets"] = request.form.getlist("datasets")
+    session["test_settings"] = saved
 
     args = form.to_cli_args()
     job = job_queue.create(type="test", name=form.job_name, args=args)

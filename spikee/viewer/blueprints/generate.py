@@ -13,6 +13,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
 import markdown as md_lib
@@ -571,6 +572,7 @@ def run() -> str:
     return render_template(
         "generate/run.html",
         seeds=_collect_seeds_with_meta(),
+        saved=session.get("generate_settings", {}),
     )
 
 
@@ -595,6 +597,12 @@ def run_post() -> Response:
     except FormValidationError as exc:
         abort(400, description=str(exc))
         return  # unreachable; satisfies type checkers
+
+    # Persist form state for next visit (tag excluded — it's per-run)
+    _excluded = {"tag", "_csrf_token"}
+    saved: dict = {k: v for k, v in request.form.items() if k not in _excluded}
+    saved["positions"] = request.form.getlist("positions")
+    session["generate_settings"] = saved
 
     args = form.to_cli_args()
     job = job_queue.create(type="generate", name=form.job_name, args=args)
