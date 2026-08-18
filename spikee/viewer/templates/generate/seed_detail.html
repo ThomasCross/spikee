@@ -122,6 +122,33 @@
     </div>
     {% endfor %}
 
+    {% for script_name in detail.scripts %}
+    <div class="card spikee-card mb-3">
+        <div class="card-header py-2 px-3 d-flex align-items-center gap-2">
+            <span class="small fw-semibold">
+                {% if script_name == 'fetch_and_convert_dataset.py' %}Fetch &amp; Convert Script{% else %}Seed Script{% endif %}
+            </span>
+            <code class="small">{{ script_name }}</code>
+        </div>
+        <div class="card-body py-3 px-3">
+            <form method="post" action="/generate/seeds/{{ seed_name }}/scripts/{{ script_name | urlencode }}"
+                  class="d-flex flex-wrap align-items-center gap-2">
+                <input type="text" class="form-control form-control-sm font-monospace flex-grow-1"
+                       name="command"
+                       value="python datasets/{{ seed_name }}/{{ script_name }}"
+                       aria-label="Command to execute">
+                {% if is_local %}
+                <button type="submit" class="btn btn-sm btn-primary">Run</button>
+                {% else %}
+                <button type="button" class="btn btn-sm btn-secondary" disabled
+                        title="Clone this seed into the workspace before running scripts">Run</button>
+                {% endif %}
+            </form>
+            <div class="form-text mt-2">Append custom script arguments to the command before running.</div>
+        </div>
+    </div>
+    {% endfor %}
+
     {# ── README ── #}
     {% if detail.readme_html %}
     <div class="card spikee-card mb-3">

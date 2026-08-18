@@ -81,7 +81,12 @@
                 </div>
                 {% endif %}
             </div>
-            {% if job.args and job.type != 'manual' %}
+            {% if job.args and job.type == 'script' %}
+            <div class="mt-2">
+                <div class="meta-label mb-1">Command</div>
+                <code class="small d-block" style="word-break:break-all;white-space:pre-wrap;">{{ job.args | join(' ') }}</code>
+            </div>
+            {% elif job.args and job.type != 'manual' %}
             <div class="mt-2">
                 <div class="meta-label mb-1">Command</div>
                 <code class="small d-block" style="word-break:break-all;white-space:pre-wrap;">spikee {{ job.args | join(' ') }}</code>

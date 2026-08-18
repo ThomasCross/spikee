@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 @dataclass
 class Job:
     id: str
-    type: str  # "generate" | "test" | "manual"
+    type: str  # "generate" | "test" | "manual" | "script"
     name: str  # human-readable label
     status: str  # "running" | "success" | "failed"
     created_at: datetime
@@ -236,12 +236,17 @@ def spawn_job(job: Job) -> None:
     Sets job.status to "success" or "failed" when the process exits.
     """
     try:
-        spikee_exe = _find_spikee_exe()
+        if job.type == "script":
+            command = list(job.args)
+        else:
+            spikee_exe = _find_spikee_exe()
+            command = [spikee_exe, "--quiet"] + job.args
         proc = subprocess.Popen(
-            [spikee_exe, "--quiet"] + job.args,
+            command,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=False,  # binary — we decode manually to handle \r correctly
+            shell=False,
             cwd=os.getcwd(),
         )
         job.process = proc

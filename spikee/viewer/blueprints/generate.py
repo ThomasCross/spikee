@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import os
+import shlex
+import sys
 from pathlib import Path
 
 from flask import (
@@ -315,7 +317,17 @@ def _load_seed_detail(seed_name: str) -> dict | None:
         except Exception:
             readme_html = None
 
-    return {"path": str(folder), "files": files, "readme_html": readme_html}
+    scripts = sorted(
+        path.name
+        for path in folder.iterdir()
+        if path.is_file() and path.suffix == ".py"
+    )
+    return {
+        "path": str(folder),
+        "files": files,
+        "scripts": scripts,
+        "readme_html": readme_html,
+    }
 
 
 def _load_dataset_entries(dataset_name: str, page: int = 1) -> dict | None:
@@ -667,6 +679,60 @@ def seed_detail(seed_name: str) -> str:
     return render_template(
         "generate/seed_detail.html", seed_name=seed_name, detail=detail, is_local=is_local
     )
+
+
+@generate_bp.route("/seeds/<seed_name>/scripts/<script_name>", methods=["POST"])
+def seed_script_run(seed_name: str, script_name: str) -> Response:
+    """Run a local seed script as a background job with user-supplied arguments."""
+    from spikee.viewer.job_queue import job_queue, spawn_job
+
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+    seed_dir = _resolve_seed_dir(seed_name, datasets_dir)
+    if seed_dir is None or not seed_dir.is_dir():
+        abort(404)
+
+    script_path = (seed_dir / script_name).resolve()
+    if (
+        script_path.parent != seed_dir
+        or script_path.suffix != ".py"
+        or not script_path.is_file()
+    ):
+        abort(404, description="Script not found in seed folder.")
+
+    command_text = (request.form.get("command") or "").strip()
+    if not command_text:
+        command_text = f"python datasets/{seed_name}/{script_name}"
+    try:
+        tokens = shlex.split(command_text, posix=False)
+    except ValueError as exc:
+        abort(400, description=f"Invalid command: {exc}")
+
+    script_token_index = next(
+        (i for i, token in enumerate(tokens) if Path(token.strip('"')).name == script_name),
+        None,
+    )
+    if script_token_index is None:
+        abort(400, description=f"Command must include {script_name}.")
+
+    script_token = tokens[script_token_index].strip('"')
+    requested_script = Path(script_token)
+    if requested_script.is_absolute():
+        requested_path = requested_script.resolve()
+    else:
+        requested_path = (Path(os.getcwd()) / requested_script).resolve()
+        if not requested_path.is_file():
+            requested_path = (seed_dir / requested_script).resolve()
+    if requested_path != script_path:
+        abort(400, description="Command script must belong to this seed folder.")
+
+    args = [sys.executable, str(script_path), *tokens[script_token_index + 1 :]]
+    job = job_queue.create(
+        type="script",
+        name=f"Script: {seed_name}/{script_name}",
+        args=args,
+    )
+    spawn_job(job)
+    return redirect(url_for("jobs.detail", job_id=job.id))
 
 
 @generate_bp.route("/datasets")
