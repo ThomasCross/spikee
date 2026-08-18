@@ -11,7 +11,6 @@ persisted to a SQLite database (stdlib sqlite3, no extra dependencies).
 
 from __future__ import annotations
 
-import html
 import json
 import os
 import shutil
@@ -19,12 +18,11 @@ import sqlite3
 import subprocess
 import sys
 import threading
-import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Optional
 
 
 _CREATE_TABLE_SQL = """
@@ -308,29 +306,6 @@ def spawn_job(job: Job) -> None:
 
     t = threading.Thread(target=_reader, daemon=True)
     t.start()
-
-
-def sse_stream(job: Job) -> Generator[str, None, None]:
-    """
-    Generator that yields SSE-formatted log lines for the given job.
-    Sends `event: done` when the job exits.
-    Used by the Jobs blueprint's /stream endpoint.
-    """
-    last = 0
-    while True:
-        with job.lock:
-            lines = list(job.log[last:])
-
-        for line in lines:
-            yield f"data: {html.escape(line)}\n\n"
-
-        last += len(lines)
-
-        if job.status != "running" and last >= len(job.log):
-            yield "event: done\ndata:\n\n"
-            return
-
-        time.sleep(0.2)
 
 
 # Module-level singleton — blueprints import this name directly.

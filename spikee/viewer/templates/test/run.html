@@ -273,10 +273,9 @@ if (_savedAttack) {
 }
 
 function resetFormDefaults(formName) {
-    const meta = document.querySelector('meta[name="csrf-token"]');
     fetch('/settings/api/reset-form', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': meta ? meta.content : '' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ form: formName })
     }).then(() => location.reload());
 }

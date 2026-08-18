@@ -14,7 +14,7 @@ import secrets
 import sys
 from pathlib import Path
 
-from flask import Flask, abort, g, render_template, request, session
+from flask import Flask, render_template
 
 from spikee.viewer.blueprints.results import results_bp
 from spikee.viewer.blueprints.generate import generate_bp
@@ -69,6 +69,9 @@ def create_app(truncate_length: int = 500, db_path: str | None = None) -> Flask:
         static_folder=str(viewer_dir / "static"),
         template_folder=str(viewer_dir / "templates"),
     )
+    # Raw dataset editing submits the full textarea as one form payload.
+    app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+    app.config["MAX_FORM_MEMORY_SIZE"] = 16 * 1024 * 1024
 
     app.secret_key = secrets.token_hex(32)
 
@@ -83,21 +86,6 @@ def create_app(truncate_length: int = 500, db_path: str | None = None) -> Flask:
         truncate_length=truncate_length,
         spikee_version=_spikee_version,
     )
-
-    # CSRF protection
-    @app.before_request
-    def _csrf_protect():
-        if "_csrf_token" not in session:
-            session["_csrf_token"] = secrets.token_hex(32)
-        g.csrf_token = session["_csrf_token"]
-        if request.method == "POST":
-            token = request.form.get("_csrf_token") or request.headers.get(
-                "X-CSRFToken", ""
-            )
-            if not token or token != session.get("_csrf_token", ""):
-                abort(403, description="Invalid CSRF token.")
-
-    app.jinja_env.globals["csrf_token"] = lambda: g.csrf_token
 
     # Initialise job queue (with optional DB persistence) before blueprints
     # so that all blueprint imports reference the updated singleton.

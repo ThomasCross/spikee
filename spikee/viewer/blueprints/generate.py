@@ -35,6 +35,7 @@ from spikee.viewer.job_queue import job_queue, spawn_job
 
 generate_bp = Blueprint("generate", __name__)
 
+
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 _DATASET_PAGE = 100  # rows shown per dataset detail page
@@ -165,7 +166,7 @@ def _collect_plugins_detail() -> list[dict]:
     return plugins
 
 
-def _normalize_row(row: dict, file_type: str) -> dict:
+def _normalize_row(row: dict, line_no: int = 0) -> dict:
     """Normalise a raw JSONL row to a consistent preview dict."""
     text = (
         row.get("text")
@@ -183,6 +184,7 @@ def _normalize_row(row: dict, file_type: str) -> dict:
         "type": row.get("jailbreak_type") or row.get("instruction_type") or "",
         "lang": row.get("lang", ""),
         "text": str(text)[:300],
+        "line_no": line_no,
     }
 
 
@@ -191,7 +193,7 @@ def _load_seed_detail(seed_name: str) -> dict | None:
     # Prevent path traversal: resolve and verify the path stays inside datasets/
     datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
     seed_path = (datasets_dir / seed_name).resolve()
-    if not str(seed_path).startswith(str(datasets_dir) + os.sep):
+    if not seed_path.is_relative_to(datasets_dir):
         return None
 
     try:
@@ -212,7 +214,7 @@ def _load_seed_detail(seed_name: str) -> dict | None:
             except Exception:
                 rows = []
             entries = len(rows)
-            preview = [_normalize_row(r, ftype) for r in rows]
+            preview = [_normalize_row(r, i) for i, r in enumerate(rows)]
         else:
             # .toml — parse with tomllib/tomli to extract system_message entries
             try:
@@ -228,6 +230,7 @@ def _load_seed_detail(seed_name: str) -> dict | None:
                         "id": i + 1,
                         "type": "",
                         "lang": "",
+                        "line_no": i,
                         "text": str(cfg.get("system_message", ""))[:300].replace(
                             "\n", " "
                         ),
@@ -320,7 +323,7 @@ def _load_dataset_entries(dataset_name: str, page: int = 1) -> dict | None:
     # Prevent path traversal: resolve and verify path stays inside datasets/
     datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
     path = (datasets_dir / dataset_name).resolve()
-    if not str(path).startswith(str(datasets_dir)):
+    if not path.is_relative_to(datasets_dir):
         return None  # reject traversal attempts
     if not path.is_file():
         return None
@@ -346,7 +349,7 @@ def _load_dataset_entries(dataset_name: str, page: int = 1) -> dict | None:
         "content",
     ]
     normalised = []
-    for r in page_rows:
+    for i, r in enumerate(page_rows):
         normalised.append(
             {
                 "id": r.get("id", "—"),
@@ -356,6 +359,7 @@ def _load_dataset_entries(dataset_name: str, page: int = 1) -> dict | None:
                 "plugin": r.get("plugin", ""),
                 "position": r.get("position", ""),
                 "content": str(r.get("content") or r.get("text") or "")[:400],
+                "line_no": offset + i,
             }
         )
 
@@ -526,14 +530,142 @@ def plugins_run() -> Response:
     return jsonify({"outputs": outputs, "count": len(outputs), "error": None})
 
 
+@generate_bp.route("/datasets/<path:dataset_name>", methods=["DELETE"])
+def dataset_delete(dataset_name: str) -> Response:
+    """Delete an entire dataset file."""
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+    file_path = _resolve_editable_path(dataset_name, datasets_dir)
+    if file_path is None or not file_path.is_file():
+        abort(404)
+    file_path.unlink()
+    return "", 200
+
+
+@generate_bp.route("/datasets/<path:dataset_name>/clone", methods=["POST"])
+def dataset_clone(dataset_name: str) -> Response:
+    """Clone a dataset file to a new name."""
+    from flask import jsonify
+
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+    file_path = _resolve_editable_path(dataset_name, datasets_dir)
+    if file_path is None or not file_path.is_file():
+        abort(404)
+    data = request.get_json(silent=True) or {}
+    new_name = data.get("new_name", "").strip()
+    if not new_name:
+        abort(400, description="new_name is required.")
+    if not new_name.endswith(".jsonl"):
+        new_name += ".jsonl"
+    new_path = (datasets_dir / new_name).resolve()
+    if not new_path.is_relative_to(datasets_dir):
+        abort(400, description="Invalid new dataset name.")
+    if new_path.exists():
+        abort(409, description="A dataset with that name already exists.")
+    import shutil
+
+    shutil.copy2(file_path, new_path)
+    return jsonify({"url": url_for("generate.dataset_detail", dataset_name=new_name)}), 201
+
+
+@generate_bp.route("/datasets/<path:dataset_name>/rename", methods=["POST"])
+def dataset_rename(dataset_name: str) -> Response:
+    """Rename a dataset file within datasets/."""
+    from flask import jsonify
+
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+    file_path = _resolve_editable_path(dataset_name, datasets_dir)
+    if file_path is None or not file_path.is_file():
+        abort(404)
+    data = request.get_json(silent=True) or {}
+    new_name = (data.get("new_name") or "").strip()
+    if not new_name:
+        abort(400, description="new_name is required.")
+    if not new_name.endswith(".jsonl"):
+        new_name += ".jsonl"
+    new_path = (datasets_dir / new_name).resolve()
+    if not new_path.is_relative_to(datasets_dir):
+        abort(400, description="Invalid new dataset name.")
+    if new_path.exists():
+        abort(409, description="A dataset with that name already exists.")
+    try:
+        file_path.rename(new_path)
+    except FileExistsError:
+        abort(409, description="A dataset with that name already exists.")
+    return jsonify({"url": url_for("generate.dataset_detail", dataset_name=new_name)}), 200
+
+
+@generate_bp.route("/seeds/<seed_name>/clone", methods=["POST"])
+def seed_clone(seed_name: str) -> Response:
+    """Clone an entire seed folder to a new name inside datasets/."""
+    from flask import jsonify
+
+    import shutil
+
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+    src_dir = _resolve_seed_dir(seed_name, datasets_dir)
+    if src_dir is None or not src_dir.is_dir():
+        abort(404)
+    data = request.get_json(silent=True) or {}
+    new_name = (data.get("new_name") or "").strip()
+    if not new_name:
+        abort(400, description="new_name is required.")
+    new_dir = _resolve_seed_dir(new_name, datasets_dir)
+    if new_dir is None:
+        abort(400, description="Invalid new seed name.")
+    if new_dir.exists():
+        abort(409, description="A seed folder with that name already exists.")
+    shutil.copytree(src_dir, new_dir)
+    return jsonify({"url": url_for("generate.seed_detail", seed_name=new_name)}), 201
+
+
+@generate_bp.route("/seeds/<seed_name>/rename", methods=["POST"])
+def seed_rename(seed_name: str) -> Response:
+    """Rename an entire seed folder within datasets/."""
+    from flask import jsonify
+
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+    src_dir = _resolve_seed_dir(seed_name, datasets_dir)
+    if src_dir is None or not src_dir.is_dir():
+        abort(404)
+    data = request.get_json(silent=True) or {}
+    new_name = (data.get("new_name") or "").strip()
+    if not new_name:
+        abort(400, description="new_name is required.")
+    new_dir = _resolve_seed_dir(new_name, datasets_dir)
+    if new_dir is None:
+        abort(400, description="Invalid new seed name.")
+    if new_dir.exists():
+        abort(409, description="A seed folder with that name already exists.")
+    try:
+        src_dir.rename(new_dir)
+    except FileExistsError:
+        abort(409, description="A seed folder with that name already exists.")
+    return jsonify({"url": url_for("generate.seed_detail", seed_name=new_name)}), 200
+
+
+@generate_bp.route("/seeds/<seed_name>", methods=["DELETE"])
+def seed_delete(seed_name: str) -> Response:
+    """Delete an entire seed folder from datasets/."""
+    import shutil
+
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+    seed_dir = _resolve_seed_dir(seed_name, datasets_dir)
+    if seed_dir is None or not seed_dir.is_dir():
+        abort(404)
+    shutil.rmtree(seed_dir)
+    return "", 200
+
+
 @generate_bp.route("/seeds/<seed_name>")
 def seed_detail(seed_name: str) -> str:
     """Render the detail view for a seed folder, showing all contained files."""
     detail = _load_seed_detail(seed_name)
     if detail is None:
         abort(404, description=f"Seed folder '{seed_name}' not found.")
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+    is_local = Path(detail["path"]).resolve().is_relative_to(datasets_dir)
     return render_template(
-        "generate/seed_detail.html", seed_name=seed_name, detail=detail
+        "generate/seed_detail.html", seed_name=seed_name, detail=detail, is_local=is_local
     )
 
 
@@ -545,10 +677,305 @@ def datasets() -> str:
     )
 
 
+# ── File editor helpers ───────────────────────────────────────────────────────
+
+_EDITABLE_EXTENSIONS = {".jsonl", ".toml"}
+
+
+def _resolve_editable_path(rel_path: str, base_dir: Path) -> Path | None:
+    """Resolve rel_path within base_dir; return None on traversal or bad extension."""
+    try:
+        resolved = (base_dir / rel_path).resolve()
+    except Exception:
+        return None
+    if not resolved.is_relative_to(base_dir.resolve()):
+        return None
+    if resolved.suffix not in _EDITABLE_EXTENSIONS:
+        return None
+    return resolved
+
+
+def _resolve_seed_dir(seed_name: str, base_dir: Path) -> Path | None:
+    """Resolve a seed folder name within base_dir; None on traversal or bad name."""
+    if not seed_name or "/" in seed_name or "\\" in seed_name or ".." in seed_name:
+        return None
+    try:
+        resolved = (base_dir / seed_name).resolve()
+    except Exception:
+        return None
+    if not resolved.is_relative_to(base_dir.resolve()):
+        return None
+    return resolved
+
+
+def _file_stats(path: Path) -> dict:
+    size = path.stat().st_size if path.exists() else 0
+    return {"size_bytes": size, "size_kb": round(size / 1024, 1)}
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    """Replace a file atomically using a temporary file in the same directory."""
+    tmp = path.parent / f".{path.name}.tmp"
+    tmp.write_text(content, encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _jsonl_rows(path: Path) -> list[dict]:
+    """Read canonical JSONL rows, ignoring blank lines."""
+    import json as _json
+
+    rows = []
+    with path.open(encoding="utf-8") as stream:
+        for line in stream:
+            if line.strip():
+                rows.append(_json.loads(line))
+    return rows
+
+
+def _write_jsonl_rows(path: Path, rows: list[dict]) -> None:
+    """Atomically write JSON objects as one compact object per line."""
+    import json as _json
+
+    content = "".join(
+        _json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
+        for row in rows
+    )
+    _atomic_write(path, content)
+
+
+def _parse_line_numbers(data: dict) -> list[int]:
+    """Validate and normalize a bulk row index payload."""
+    values = data.get("line_numbers")
+    if not isinstance(values, list) or not values:
+        abort(400, description="line_numbers must be a non-empty list.")
+    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in values):
+        abort(400, description="line_numbers must contain non-negative integers.")
+    if len(set(values)) != len(values):
+        abort(400, description="line_numbers must not contain duplicates.")
+    return values
+
+
+# ── Line mutation routes ─────────────────────────────────────────────────────
+
+
+@generate_bp.route("/seeds/<seed_name>/lines/<filename>", methods=["POST"])
+def seed_delete_line(seed_name: str, filename: str) -> Response:
+    """Delete selected JSONL rows from a local seed file."""
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+    try:
+        seed_folder = Path(str(resolve_seed_folder(f"datasets/{seed_name}")))
+    except Exception:
+        abort(404)
+    if not seed_folder.resolve().is_relative_to(datasets_dir):
+        abort(403)
+    file_path = _resolve_editable_path(filename, seed_folder)
+    if file_path is None or not file_path.is_file():
+        abort(404)
+    line_numbers = _parse_line_numbers(request.get_json(silent=True) or {})
+    rows = _jsonl_rows(file_path)
+    if any(line_no >= len(rows) for line_no in line_numbers):
+        abort(404, description="One or more rows no longer exist.")
+    _write_jsonl_rows(file_path, [row for i, row in enumerate(rows) if i not in line_numbers])
+    return Response(status=204)
+
+
+@generate_bp.route("/datasets/<path:dataset_name>/lines", methods=["POST"])
+def dataset_delete_line(dataset_name: str) -> Response:
+    """Delete selected JSONL rows from a dataset file."""
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+    file_path = _resolve_editable_path(dataset_name, datasets_dir)
+    if file_path is None or not file_path.is_file():
+        abort(404)
+    line_numbers = _parse_line_numbers(request.get_json(silent=True) or {})
+    rows = _jsonl_rows(file_path)
+    if any(line_no >= len(rows) for line_no in line_numbers):
+        abort(404, description="One or more rows no longer exist.")
+    _write_jsonl_rows(file_path, [row for i, row in enumerate(rows) if i not in line_numbers])
+    return Response(status=204)
+
+
+def _render_entry_editor(
+    file_path: Path,
+    filename: str,
+    back_url: str,
+    line_no: int | None,
+    content: str | None = None,
+    error: str | None = None,
+    is_new: bool = False,
+) -> str:
+    import json as _json
+
+    rows = _jsonl_rows(file_path)
+    if is_new:
+        line_no = len(rows)
+        formatted = content if content is not None else _json.dumps({}, indent=2, ensure_ascii=False)
+    else:
+        if line_no is None or line_no < 0 or line_no >= len(rows):
+            abort(404, description="JSONL row not found.")
+        formatted = content if content is not None else _json.dumps(rows[line_no], indent=2, ensure_ascii=False)
+    return render_template(
+        "generate/edit_file.html",
+        filename=filename,
+        content=formatted,
+        back_url=back_url,
+        error=error,
+        mode="entry",
+        is_new=is_new,
+        line_no=line_no,
+        total_entries=len(rows),
+        **_file_stats(file_path),
+    )
+
+
+def _entry_post(file_path: Path, line_no: int | None, is_new: bool, content: str, back_url: str, filename: str) -> Response | str:
+    import json as _json
+
+    try:
+        value = _json.loads(content)
+    except _json.JSONDecodeError as exc:
+        return _render_entry_editor(file_path, filename, back_url, line_no, content, f"JSON error: {exc}", is_new)
+    if not isinstance(value, dict):
+        return _render_entry_editor(file_path, filename, back_url, line_no, content, "An entry must be a JSON object.", is_new)
+
+    rows = _jsonl_rows(file_path)
+    if is_new:
+        rows.append(value)
+    elif line_no is None or line_no < 0 or line_no >= len(rows):
+        abort(404, description="JSONL row no longer exists.")
+    else:
+        rows[line_no] = value
+    _write_jsonl_rows(file_path, rows)
+    return redirect(back_url + "?saved=1")
+
+
+def _seed_jsonl_path(seed_name: str, filename: str) -> Path:
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+    try:
+        seed_folder = Path(str(resolve_seed_folder(f"datasets/{seed_name}")))
+    except Exception:
+        abort(404)
+    if not seed_folder.resolve().is_relative_to(datasets_dir):
+        abort(403, description="Built-in seeds are not editable.")
+    file_path = _resolve_editable_path(filename, seed_folder)
+    if file_path is None or file_path.suffix != ".jsonl" or not file_path.is_file():
+        abort(404)
+    return file_path
+
+
+@generate_bp.route("/seeds/<seed_name>/entries/<int:line_no>/edit", methods=["GET", "POST"])
+def seed_entry_edit(seed_name: str, line_no: int) -> Response | str:
+    filename = request.args.get("filename", "")
+    file_path = _seed_jsonl_path(seed_name, filename)
+    back_url = url_for("generate.seed_detail", seed_name=seed_name)
+    if request.method == "POST":
+        return _entry_post(file_path, line_no, False, request.form.get("content", ""), back_url, filename)
+    return _render_entry_editor(file_path, filename, back_url, line_no)
+
+
+@generate_bp.route("/seeds/<seed_name>/entries/<filename>/new", methods=["GET", "POST"])
+def seed_entry_new(seed_name: str, filename: str) -> Response | str:
+    file_path = _seed_jsonl_path(seed_name, filename)
+    back_url = url_for("generate.seed_detail", seed_name=seed_name)
+    if request.method == "POST":
+        return _entry_post(file_path, None, True, request.form.get("content", ""), back_url, filename)
+    return _render_entry_editor(file_path, filename, back_url, None, is_new=True)
+
+
+def _dataset_jsonl_path(dataset_name: str) -> Path:
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+    file_path = _resolve_editable_path(dataset_name, datasets_dir)
+    if file_path is None or file_path.suffix != ".jsonl" or not file_path.is_file():
+        abort(404)
+    return file_path
+
+
+@generate_bp.route("/datasets/<path:dataset_name>/entries/<int:line_no>/edit", methods=["GET", "POST"])
+def dataset_entry_edit(dataset_name: str, line_no: int) -> Response | str:
+    file_path = _dataset_jsonl_path(dataset_name)
+    back_url = url_for("generate.dataset_detail", dataset_name=dataset_name)
+    if request.method == "POST":
+        return _entry_post(file_path, line_no, False, request.form.get("content", ""), back_url, dataset_name)
+    return _render_entry_editor(file_path, dataset_name, back_url, line_no)
+
+
+@generate_bp.route("/datasets/<path:dataset_name>/entries/new", methods=["GET", "POST"])
+def dataset_entry_new(dataset_name: str) -> Response | str:
+    file_path = _dataset_jsonl_path(dataset_name)
+    back_url = url_for("generate.dataset_detail", dataset_name=dataset_name)
+    if request.method == "POST":
+        return _entry_post(file_path, None, True, request.form.get("content", ""), back_url, dataset_name)
+    return _render_entry_editor(file_path, dataset_name, back_url, None, is_new=True)
+
+
+@generate_bp.route("/seeds/<seed_name>/edit/<filename>", methods=["GET", "POST"])
+def seed_edit(seed_name: str, filename: str) -> Response | str:
+    """Render the unchecked raw editor for a seed file."""
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+
+    # Resolve the seed folder first so we can locate the file inside it.
+    try:
+        seed_folder = Path(str(resolve_seed_folder(f"datasets/{seed_name}")))
+    except Exception:
+        abort(404)
+
+    # Reject built-in seeds (outside CWD/datasets/) and path traversal.
+    if not seed_folder.resolve().is_relative_to(datasets_dir):
+        abort(403, description="Built-in seeds are not editable.")
+
+    file_path = _resolve_editable_path(filename, seed_folder)
+    if file_path is None or not file_path.is_file():
+        abort(404)
+
+    back_url = url_for("generate.seed_detail", seed_name=seed_name)
+
+    if request.method == "POST":
+        content = request.form.get("content", "")
+        _atomic_write(file_path, content)
+        return redirect(back_url + "?saved=1")
+
+    content = file_path.read_text(encoding="utf-8")
+    stats = _file_stats(file_path)
+    return render_template(
+        "generate/edit_file.html",
+        filename=filename, content=content, back_url=back_url,
+        error=None, mode="raw", is_new=False, line_no=None, total_entries=None, **stats,
+    )
+
+
+# ── Dataset file editor ───────────────────────────────────────────────────────
+
+
+@generate_bp.route("/datasets/<path:dataset_name>/edit", methods=["GET", "POST"])
+def dataset_edit(dataset_name: str) -> Response | str:
+    """Render the unchecked raw editor for a dataset JSONL."""
+    datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
+    file_path = _resolve_editable_path(dataset_name, datasets_dir)
+    if file_path is None or not file_path.is_file():
+        abort(404)
+
+    back_url = url_for("generate.dataset_detail", dataset_name=dataset_name)
+
+    if request.method == "POST":
+        content = request.form.get("content", "")
+        _atomic_write(file_path, content)
+        return redirect(back_url + "?saved=1")
+
+    content = file_path.read_text(encoding="utf-8")
+    stats = _file_stats(file_path)
+    return render_template(
+        "generate/edit_file.html",
+        filename=dataset_name, content=content, back_url=back_url,
+        error=None, mode="raw", is_new=False, line_no=None, total_entries=None, **stats,
+    )
+
+
 @generate_bp.route("/datasets/<path:dataset_name>")
 def dataset_detail(dataset_name: str) -> str:
     """Render a paginated view of a single dataset's entries."""
-    page = max(1, int(request.args.get("page", 1)))
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except (TypeError, ValueError):
+        page = 1
     result = _load_dataset_entries(dataset_name, page)
     if result is None:
         abort(404, description=f"Dataset '{dataset_name}' not found.")
@@ -599,7 +1026,7 @@ def run_post() -> Response:
         return  # unreachable; satisfies type checkers
 
     # Persist form state for next visit (tag excluded — it's per-run)
-    _excluded = {"tag", "_csrf_token"}
+    _excluded = {"tag"}
     saved: dict = {k: v for k, v in request.form.items() if k not in _excluded}
     saved["positions"] = request.form.getlist("positions")
     session["generate_settings"] = saved

@@ -153,7 +153,3 @@ def log(job_id: str) -> Response:
     return jsonify({"status": status, "log": log_snapshot})
 
 
-@jobs_bp.route("/<job_id>/stream")
-def stream(job_id: str) -> Response:
-    """SSE log stream — not yet implemented."""
-    abort(501, description="SSE streaming is not yet implemented.")

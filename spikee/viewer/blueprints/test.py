@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import threading
+from pathlib import Path
 
 from flask import (
     Blueprint,
@@ -158,7 +159,7 @@ def run_post() -> Response:
         return  # unreachable; satisfies type checkers
 
     # Persist form state for next visit (tag excluded — it's per-run)
-    _excluded = {"tag", "_csrf_token"}
+    _excluded = {"tag"}
     saved: dict = {k: v for k, v in request.form.items() if k not in _excluded}
     saved["datasets"] = request.form.getlist("datasets")
     session["test_settings"] = saved
@@ -445,13 +446,15 @@ def _read_jsonl_entry_at(path: str, index: int) -> dict | None:
     """Return the entry at *index* from a JSONL file without loading the whole file."""
     try:
         with open(path, encoding="utf-8") as fh:
-            for i, line in enumerate(fh):
+            logical_index = 0
+            for line in fh:
                 line = line.strip()
                 if not line:
                     continue
-                if i == index:
+                if logical_index == index:
                     import json as _json
                     return _json.loads(line)
+                logical_index += 1
     except (OSError, ValueError):
         pass
     return None
@@ -466,7 +469,6 @@ def _manual_result_key(output_file: str) -> str:
 @test_bp.route("/manual")
 def manual_start() -> str:
     """Render the manual dataset session start page."""
-    from spikee.viewer.blueprints.generate import _collect_plugins_detail  # noqa: F401
     return render_template(
         "test/manual_start.html",
         datasets=_collect_datasets(),
@@ -502,10 +504,10 @@ def manual_start_post() -> Response:
         abort(400, description="No dataset selected.")
 
     datasets_dir = os.path.join(os.getcwd(), "datasets")
-    dataset_path = os.path.normpath(os.path.join(datasets_dir, dataset))
-    if not dataset_path.startswith(os.path.normpath(datasets_dir)):
+    dataset_path = (Path(datasets_dir) / dataset).resolve()
+    if not dataset_path.is_relative_to(Path(datasets_dir).resolve()):
         abort(400, description="Invalid dataset path.")
-    if not os.path.isfile(dataset_path):
+    if not dataset_path.is_file():
         abort(400, description=f"Dataset '{dataset}' not found.")
 
     total_lines = _count_file_lines(dataset_path)
@@ -538,7 +540,7 @@ def manual_start_post() -> Response:
         name=job_name,
         args={
             "dataset": dataset,
-            "dataset_path": dataset_path,
+            "dataset_path": str(dataset_path),
             "total": total,
             "output_file": output_file,
             "judge_options": judge_options,

@@ -12,12 +12,33 @@
         {% if detail.description %}
         <span class="text-muted small">— {{ detail.description }}</span>
         {% endif %}
-        <div class="ms-auto">
+        <div class="ms-auto d-flex align-items-center gap-2">
+            <button type="button" id="clone-seed-btn" class="btn btn-sm btn-outline-primary" title="Clone seed folder">
+                <i class="bi bi-files"></i> Clone
+            </button>
+            {% if is_local %}
+            <button type="button" id="rename-seed-btn" class="btn btn-sm btn-outline-warning" title="Rename seed folder">
+                <i class="bi bi-pencil"></i> Rename
+            </button>
+            <button type="button" id="delete-seed-btn" class="btn btn-sm btn-outline-danger" title="Delete seed folder">
+                <i class="bi bi-trash"></i> Delete
+            </button>
+            {% else %}
+            <button type="button" class="btn btn-sm btn-outline-warning" disabled
+                    title="Built-in seed — clone it into your workspace to rename">Rename</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" disabled
+                    title="Built-in seed — clone it into your workspace to delete">Delete</button>
+            {% endif %}
+            <span class="text-muted px-1">|</span>
             <a href="/generate/run?seed_folder={{ seed_name }}" class="btn btn-sm btn-spikee">
                 Generate dataset &rarr;
             </a>
         </div>
     </div>
+
+    {% if request.args.get('saved') %}
+    <div class="alert alert-success py-2 small mb-3">File saved successfully.</div>
+    {% endif %}
 
     {# ── File cards ── #}
     {% for file in detail.files %}
@@ -26,35 +47,53 @@
             <span class="badge {{ file.badge }}">{{ file.label }}</span>
             <code class="small">{{ file.name }}</code>
             <span class="ms-auto text-muted small">{{ file.entries }} entr{{ 'y' if file.entries == 1 else 'ies' }}</span>
+                {% if is_local %}
+            <a href="/generate/seeds/{{ seed_name }}/edit/{{ file.name }}"
+                       class="btn btn-xs btn-secondary">Raw Edit</a>
+            {% else %}
+            <button class="btn btn-xs btn-outline-secondary" disabled
+                    title="Built-in seed — copy to workspace/datasets/ to edit">Raw Edit</button>
+            {% endif %}
+                {% if is_local and file.name.endswith('.jsonl') %}
+                <a href="/generate/seeds/{{ seed_name }}/entries/{{ file.name }}/new"
+                   class="btn btn-xs btn-primary">New Row</a>
+                <button type="button" class="btn btn-xs btn-danger seed-delete-selected"
+                    data-seed="{{ seed_name }}" data-file="{{ file.name }}" disabled>Delete Rows</button>
+                {% endif %}
             {% if file.preview %}
             <button class="btn btn-xs btn-outline-secondary d-flex align-items-center gap-1"
                     type="button"
                     data-bs-toggle="collapse"
                     data-bs-target="#collapse-{{ loop.index }}"
-                    aria-expanded="{% if loop.first %}true{% else %}false{% endif %}"
-                    onclick="this.querySelector('.toggle-icon').classList.toggle('bi-chevron-down'); this.querySelector('.toggle-icon').classList.toggle('bi-chevron-up');">
-                <i class="bi toggle-icon {% if loop.first %}bi-chevron-up{% else %}bi-chevron-down{% endif %}"></i>
-                <span>Preview</span>
+                    aria-expanded="false">
+                <span class="collapse-label">Expand</span>
             </button>
             {% endif %}
         </div>
 
         {% if file.preview %}
-        <div class="collapse {% if loop.first %}show{% endif %}" id="collapse-{{ loop.index }}">
+        <div class="collapse" id="collapse-{{ loop.index }}">
             <div class="table-responsive">
                 <table class="table table-sm table-hover align-middle text-start mb-0">
                     {% set col_labels = {'id': '#', 'type': 'Type', 'lang': 'Lang', 'text': 'Text preview'} %}
                     <thead class="table-light border-bottom">
                         <tr>
+                            {% if is_local and file.name.endswith('.jsonl') %}
+                            <th style="width:34px"><input type="checkbox" class="seed-select-all" data-file="{{ file.name }}" aria-label="Select all rows"></th>
+                            {% endif %}
                             {% for col in file.columns %}
                             <th class="{% if loop.first %}ps-3 {% endif %}text-muted small fw-semibold"
                                 style="{% if col != 'text' %}width:{{ file.col_widths[col] }}{% endif %}">{{ col_labels[col] }}</th>
                             {% endfor %}
+                            {% if is_local and file.name.endswith('.jsonl') %}<th style="width:48px"></th>{% endif %}
                         </tr>
                     </thead>
                     <tbody>
                         {% for row in file.preview %}
                         <tr>
+                            {% if is_local and file.name.endswith('.jsonl') %}
+                            <td><input type="checkbox" class="seed-row-check" data-file="{{ file.name }}" data-line-no="{{ row.line_no }}" aria-label="Select row"></td>
+                            {% endif %}
                             {% for col in file.columns %}
                             {% if col == 'id' %}
                             <td class="ps-3 text-muted small font-monospace">{{ row.id }}</td>
@@ -63,9 +102,16 @@
                             {% elif col == 'lang' %}
                             <td class="small text-muted">{{ row.lang or '—' }}</td>
                             {% elif col == 'text' %}
-                            <td class="small" style="word-break:break-word;white-space:normal">{{ row.text }}</td>
+                            <td class="small" style="word-break:break-word;white-space:pre-wrap">{{ row.text }}</td>
                             {% endif %}
                             {% endfor %}
+                            {% if is_local and file.name.endswith('.jsonl') %}
+                            <td class="text-end pe-2 d-flex gap-1 justify-content-end">
+                                <a class="btn btn-xs btn-outline-primary"
+                                   href="/generate/seeds/{{ seed_name }}/entries/{{ row.line_no }}/edit?filename={{ file.name | urlencode }}"
+                                   aria-label="Edit row">Edit</a>
+                            </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -90,4 +136,114 @@
     {% endif %}
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    try {
+        var name = '{{ seed_name }}';
+        var isLocal = {{ 'true' if is_local else 'false' }};
+
+        document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(function (button) {
+            var target = document.querySelector(button.getAttribute('data-bs-target'));
+            if (!target) return;
+            target.addEventListener('shown.bs.collapse', function () {
+                button.setAttribute('aria-expanded', 'true');
+                button.querySelector('.collapse-label').textContent = 'Collapse';
+            });
+            target.addEventListener('hidden.bs.collapse', function () {
+                button.setAttribute('aria-expanded', 'false');
+                button.querySelector('.collapse-label').textContent = 'Expand';
+            });
+        });
+
+        // Clone
+        var cloneBtn = document.getElementById('clone-seed-btn');
+        if (cloneBtn) {
+            cloneBtn.addEventListener('click', function () {
+                spikee.promptModal('Clone "' + name + '" as:', name + '-copy').then(function (newName) {
+                    if (newName === null || !String(newName).trim()) return;
+                    return spikee.fetchJson('/generate/seeds/' + encodeURIComponent(name) + '/clone', {
+                        method: 'POST',
+                        body: JSON.stringify({ new_name: newName.trim() })
+                    }).then(function (data) {
+                        if (data && data.url) window.location.href = data.url;
+                    }).catch(function (err) {
+                        alert('Clone failed: ' + err.message);
+                    });
+                });
+            });
+        }
+
+        // Rename (local only)
+        var renameBtn = document.getElementById('rename-seed-btn');
+        if (renameBtn) {
+            renameBtn.addEventListener('click', function () {
+                spikee.promptModal('Rename "' + name + '" to:', name).then(function (newName) {
+                    if (newName === null || !String(newName).trim()) return;
+                    newName = newName.trim();
+                    return spikee.fetchJson('/generate/seeds/' + encodeURIComponent(name) + '/rename', {
+                        method: 'POST',
+                        body: JSON.stringify({ new_name: newName })
+                    }).then(function (data) {
+                        if (data && data.url) window.location.href = data.url;
+                    }).catch(function (err) {
+                        alert('Rename failed: ' + err.message);
+                    });
+                });
+            });
+        }
+
+        // Delete (local only)
+        var deleteBtn = document.getElementById('delete-seed-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function () {
+                if (!confirm('Delete "' + name + '" and all its contents? This cannot be undone.')) return;
+                return spikee.fetchJson('/generate/seeds/' + encodeURIComponent(name), {
+                    method: 'DELETE'
+                }).then(function () {
+                    window.location.href = '/generate/seeds';
+                }).catch(function (err) {
+                    alert('Delete failed: ' + err.message);
+                });
+            });
+        }
+
+        document.querySelectorAll('.seed-select-all').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var file = button.dataset.file;
+                var checks = document.querySelectorAll('.seed-row-check[data-file="' + CSS.escape(file) + '"]');
+                var shouldSelect = Array.from(checks).some(function (check) { return !check.checked; });
+                checks.forEach(function (check) { check.checked = shouldSelect; });
+                updateSeedDeleteButton(file);
+            });
+        });
+
+        function updateSeedDeleteButton(file) {
+            var count = document.querySelectorAll('.seed-row-check[data-file="' + CSS.escape(file) + '"]:checked').length;
+            var button = document.querySelector('.seed-delete-selected[data-file="' + CSS.escape(file) + '"]');
+            if (button) button.disabled = count === 0;
+        }
+
+        document.querySelectorAll('.seed-row-check').forEach(function (check) {
+            check.addEventListener('change', function () { updateSeedDeleteButton(check.dataset.file); });
+        });
+        document.querySelectorAll('.seed-delete-selected').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var file = button.dataset.file;
+                var lineNumbers = Array.from(document.querySelectorAll('.seed-row-check[data-file="' + CSS.escape(file) + '"]:checked'))
+                    .map(function (check) { return Number(check.dataset.lineNo); });
+                if (!lineNumbers.length || !confirm('Delete ' + lineNumbers.length + ' selected row(s)?')) return;
+                spikee.fetchJson('/generate/seeds/' + encodeURIComponent(name) + '/lines/' + encodeURIComponent(file), {
+                    method: 'POST', body: JSON.stringify({ line_numbers: lineNumbers })
+                }).then(function () { window.location.reload(); }).catch(function (err) { alert('Delete failed: ' + err.message); });
+            });
+        });
+    } catch (e) {
+        console.error('[seed_detail] init error', e);
+        alert('seed detail init error: ' + e.message);
+    }
+})();
+</script>
 {% endblock %}
