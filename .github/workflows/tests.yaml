@@ -40,8 +40,8 @@ jobs:
         env:
           CAN_PUSH_FIXES: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         run: |
-          ruff format .
-          ruff check --fix .
+          ruff format ./spikee/
+          ruff check --fix ./spikee/
           if ! git diff --quiet; then
             if [[ "$CAN_PUSH_FIXES" == "true" ]]; then
               git config user.name "github-actions[bot]"
