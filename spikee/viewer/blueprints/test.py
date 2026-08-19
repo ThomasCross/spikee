@@ -479,7 +479,6 @@ def manual_start() -> str:
 def manual_start_post() -> Response:
     """Create a manual job and redirect to the session page."""
     import random as _random
-    from pathlib import Path
     from spikee.utilities.files import build_file_name
 
     dataset = (request.form.get("dataset") or "").strip()
@@ -591,7 +590,6 @@ def manual_session(job_id: str) -> Response | str:
 @test_bp.route("/manual/<job_id>", methods=["POST"])
 def manual_session_post(job_id: str) -> Response:
     """Save the current entry's response and advance to the next."""
-    import json as _json
     import time as _time
     from spikee.utilities.files import append_jsonl_entry
     from spikee.judge import call_judge, annotate_judge_options
