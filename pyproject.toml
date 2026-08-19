@@ -37,4 +37,4 @@ include = [ "spikee*",]
 exclude = [ "datasets*", "results*", "targets*", "plugins*", "attacks*", "judges*", "templates*", "utilities*",]
 
 [tool.ruff]
-extend-exclude = [ ".github/*",]
+include = [ "**/*.py",]
