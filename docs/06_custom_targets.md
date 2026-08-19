@@ -257,8 +257,8 @@ associated_ids = self._get_id_map(spikee_session_id)  # Retrieve the mapped targ
 
 
 
-See `workspace/targets/test_chatbot.py` for an example implementation of a `MultiTarget` target that manually manages session state and history.
-See `workspace/targets/simple_test_chatbot.py` for an example implementation of a `SimpleMultiTarget` that simplifies this process.
+See `workspace/targets/sample_simple_chatbot.py` for a `SimpleMultiTarget` example that uses Spikee's session and history helpers.
+See `workspace/targets/sample_chatbot.py` for a `MultiTarget` example that manually manages session state, history, and replay-based backtracking.
 
 ### Multi-Turn Target Template
 ```python

@@ -28,8 +28,7 @@ except ImportError as error:
 
 from spikee.templates.plugin import Plugin
 from spikee.utilities.enums import ModuleTag
-from spikee.utilities.hinting import Image
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
+from spikee.utilities.hinting import Image, ModuleDescriptionHint, ModuleOptionsHint
 
 
 class SampleImagePlugin(Plugin):

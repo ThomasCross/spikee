@@ -58,8 +58,8 @@ Spikee includes a variety of built-in and sample targets, which can be listed at
 | `sample_target` | Single-Turn | Sends a GET request to a fictional application, demonstrating options and advanced guardrail and error handling. |
 | `sample_target_legacy` | Single-Turn (Legacy) | Returns a mock message. This is a legacy target, demonstrating the older target format. |
 | `sample_pdf_request_target` | Single-Turn | Sends a POST request containing a PDF to a fictional application. |
-| `test_chatbot` | Multi-Turn | Sends requests to [Spikee Test Chatbot](https://github.com/ReversecLabs/spikee-test-chatbot) |
-| `simple_test_chatbot` | Multi-Turn | Implements the simple multi-turn target, and sends requests to [Spikee Test Chatbot](https://github.com/ReversecLabs/spikee-test-chatbot) |
+| `sample_simple_chatbot` | Multi-Turn | Uses `SimpleMultiTarget` with [Spikee Test Chatbot](https://github.com/ReversecLabs/spikee-test-chatbot) |
+| `sample_chatbot` | Multi-Turn | Uses `MultiTarget` with replay-based backtracking for [Spikee Test Chatbot](https://github.com/ReversecLabs/spikee-test-chatbot) |
 |`llm_mailbox` | Single-Turn | Sample target for email summarisation application [tutorial](https://labs.reversec.com/posts/2025/01/spikee-testing-llm-applications-for-prompt-injection) |
 
 **Usage Example**

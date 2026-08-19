@@ -8,7 +8,7 @@ The example URLs are fictional and meant to illustrate how to structure such a t
 Usage:
     1. Place this file in your local `targets/` folder.
     2. Run the spikee test command, pointing to this target, e.g.:
-         spikee test --dataset datasets/example.jsonl --target sample__target
+            spikee test --dataset datasets/example.jsonl --target sample_target
 
 Return values:
     - For typical LLM completion, return a string that represents the model's response.
@@ -78,13 +78,16 @@ class SampleRequestTarget(Target):
             result = response.json()
             return result.get("answer", "No answer available.")
 
-        except requests.exceptions.RequestException as e:
-            if response.status_code == 400:  # Guardrail Triggered
-                raise GuardrailTrigger(f"Guardrail was triggered by the target: {e}")
+        except requests.exceptions.HTTPError as error:
+            status_code = error.response.status_code if error.response else None
+            if status_code == 400:
+                raise GuardrailTrigger(
+                    f"Input Guardrail blocked the request: {error}",
+                    categories={"Prompt Injection": True},
+                )
 
-            else:
-                print(f"Error during HTTP request: {e}")
-                raise
+            print(f"HTTP error during request: {error}")
+            raise
 
 
 if __name__ == "__main__":
