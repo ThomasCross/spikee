@@ -14,17 +14,17 @@ Usage:
 
 import json
 import random
-from typing import Callable, List
+from collections.abc import Callable
 
-from spikee.tester import AdvancedTargetWrapper
 from spikee.templates.attack import Attack
+from spikee.tester import AdvancedTargetWrapper
+from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import (
+    AttackResponseHint,
     ModuleDescriptionHint,
     ModuleOptionsHint,
-    AttackResponseHint,
     process_target_content,
 )
-from spikee.utilities.enums import ModuleTag
 from spikee.utilities.llm import get_llm
 from spikee.utilities.llm_message import HumanMessage, SystemMessage
 
@@ -54,7 +54,7 @@ class PromptDecompositionAttack(Attack):
 
         return self.DEFAULT_MODE
 
-    def _generate_variants_dumb(self, text: str) -> List[str]:
+    def _generate_variants_dumb(self, text: str) -> list[str]:
         """
         Splits the input into labeled chunks, shuffles them, and outputs structured rewrites.
         """
@@ -121,7 +121,7 @@ class PromptDecompositionAttack(Attack):
 
     def _generate_variants_llm(
         self, text: str, mode: str, max_iterations: int
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Uses an LLM to decompose a prompt into meaningful components and generate
         variations that present those parts in shuffled order with instructions.
@@ -206,12 +206,12 @@ class PromptDecompositionAttack(Attack):
                                 variations.append(data["variation"])
                         except json.JSONDecodeError:
                             continue
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass  # Ignore errors in the additional generation
 
             return variations if variations else [text]
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error generating LLM variants: {e}")
             return [text]  # Return original text as fallback
 
@@ -270,7 +270,7 @@ class PromptDecompositionAttack(Attack):
 
                     last_response = response
                     success = call_judge(entry, response)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     success = False
                     last_response = str(e)
                     print(
@@ -299,9 +299,9 @@ class PromptDecompositionAttack(Attack):
                 last_response,
             )
 
-        except ImportError as ie:
-            raise ie
+        except ImportError:
+            raise
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error in prompt decomposition attack: {e}")
             return 0, False, last_payload, str(e)

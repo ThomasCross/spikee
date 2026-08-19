@@ -11,21 +11,20 @@ Returns:
   (iterations_used:int, success:bool, attack_prompt:str, last_response:str)
 """
 
-from typing import Callable, Dict, List
+from collections.abc import Callable
 
-from spikee.tester import AdvancedTargetWrapper
 from spikee.templates.attack import Attack
+from spikee.tester import AdvancedTargetWrapper
+from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import (
+    AttackResponseHint,
     ModuleDescriptionHint,
     ModuleOptionsHint,
-    AttackResponseHint,
     process_target_content,
 )
-from spikee.utilities.enums import ModuleTag
 from spikee.utilities.llm import get_llm
 from spikee.utilities.llm_message import HumanMessage
-from spikee.utilities.modules import parse_options, extract_json_or_fail
-
+from spikee.utilities.modules import extract_json_or_fail, parse_options
 
 # LLM Jailbreaker prompt template
 SPIKEE_LLM_JAILBREAKER_PROMPT = """
@@ -115,7 +114,7 @@ class LLMJailbreaker(Attack):
         return [], True
 
     def _generate_jailbreak_attack(
-        self, llm, objective: str, previous_attempts: List[Dict]
+        self, llm, objective: str, previous_attempts: list[dict]
     ) -> str:
         """Generate a jailbreak attack using the LLM."""
         # Format previous attempts for the prompt
@@ -218,8 +217,8 @@ class LLMJailbreaker(Attack):
                                 attempts_bar.refresh()
                     return i, True, attack_prompt, last_response
 
-            except Exception as e:
-                last_response = f"Error during attack attempt {i}: {str(e)}"
+            except Exception as e:  # noqa: BLE001
+                last_response = f"Error during attack attempt {i}: {e!s}"
                 # If generation fails, we might as well stop or continue.
                 # Here we continue logging the error.
                 print(f"[LLMJailbreaker] Error: {e}")

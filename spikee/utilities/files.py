@@ -1,8 +1,9 @@
 import json
-from pathlib import Path
 import os
 import re
+import sys
 import time
+from pathlib import Path
 
 try:
     import tomllib
@@ -47,10 +48,9 @@ def write_jsonl_file(output_file, data):
 
 def append_jsonl_entry(output_file, entry, file_lock):
     """Appends a single entry to a JSONL file in a thread-safe manner."""
-    with file_lock:
-        with open(output_file, "a", encoding="utf-8") as f:
-            json.dump(entry, f, ensure_ascii=False)
-            f.write("\n")
+    with file_lock, open(output_file, "a", encoding="utf-8") as f:
+        json.dump(entry, f, ensure_ascii=False)
+        f.write("\n")
 
 
 # ==== Processing JSONL Input Files ====
@@ -67,7 +67,7 @@ def process_jsonl_input_files(file_paths, folder_paths, file_type=None):
 
     if result_files == []:
         print("[Error] No JSONL files included for analysis.")
-        exit(1)
+        sys.exit(1)
 
     return result_files
 
@@ -95,8 +95,7 @@ def extract_resource_name(file_name: str):
     file_name = os.path.basename(file_name)
     file_name = re.sub(r"^\d+-", "", file_name)
     file_name = re.sub(r".jsonl$", "", file_name)
-    if file_name.startswith("seeds-"):
-        file_name = file_name[len("seeds-") :]
+    file_name = file_name.removeprefix("seeds-")
     return file_name
 
 

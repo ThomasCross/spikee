@@ -17,18 +17,15 @@ Additional options are forwarded to the provider's setup() as keyword arguments:
   elevenlabs_tts:  voice_id, output_format
 """
 
-from typing import List, Optional
-
-
 from spikee.templates.plugin import Plugin
+from spikee.templates.provider import Provider
+from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import (
+    Audio,
     ModuleDescriptionHint,
     ModuleOptionsHint,
-    Audio,
     get_content,
 )
-from spikee.utilities.enums import ModuleTag
-from spikee.templates.provider import Provider
 from spikee.utilities.llm import get_llm
 from spikee.utilities.llm_message import HumanMessage
 from spikee.utilities.modules import parse_options
@@ -52,7 +49,7 @@ class TTSPlugin(Plugin):
     def transform(
         self,
         content: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
     ) -> Audio:
         opts = parse_options(plugin_option)
@@ -73,13 +70,13 @@ class TTSPlugin(Plugin):
         )
 
         if not isinstance(llm, Provider):
-            raise ValueError(
+            raise TypeError(
                 f"Selected model '{llm_model}' is not a valid Provider instance."
             )
 
         llm_description = llm.get_description()[0]
         if ModuleTag.LLM_TTS not in llm_description:
-            raise ValueError(
+            raise TypeError(
                 f"Selected model '{llm_model}' is not a valid TTS provider."
             )
 
@@ -88,7 +85,7 @@ class TTSPlugin(Plugin):
         if isinstance(response, Audio):
             return response
         else:
-            raise ValueError(
+            raise TypeError(
                 f"Unexpected response type from TTS provider: {type(response)}. Expected Audio."
             )
 
@@ -111,8 +108,9 @@ if __name__ == "__main__":
 
     try:
         import io
-        import soundfile as sf
+
         import sounddevice as sd
+        import soundfile as sf
 
         data, sample_rate = sf.read(io.BytesIO(audio_bytes))
         sd.play(data, sample_rate)

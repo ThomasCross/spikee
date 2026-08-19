@@ -20,10 +20,8 @@ import sys
 import threading
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
-
 
 _CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -49,15 +47,15 @@ class Job:
     args: object  # CLI args list OR dict for manual jobs
     log: list = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
-    returncode: Optional[int] = None
-    process: Optional[object] = None  # subprocess.Popen
+    returncode: int | None = None
+    process: object | None = None  # subprocess.Popen
 
 
 class JobQueue:
-    def __init__(self, db_path: Optional[str] = None) -> None:
+    def __init__(self, db_path: str | None = None) -> None:
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
-        self._db_path: Optional[str] = db_path
+        self._db_path: str | None = db_path
 
         if db_path is not None:
             # Ensure parent directories exist
@@ -147,7 +145,7 @@ class JobQueue:
             type=type,
             name=name,
             status="running",
-            created_at=datetime.now(),
+            created_at=datetime.now(UTC),
             args=args,
         )
         with self._lock:
@@ -156,7 +154,7 @@ class JobQueue:
             self._db_insert(job)
         return job
 
-    def get(self, job_id: str) -> Optional[Job]:
+    def get(self, job_id: str) -> Job | None:
         """Return the job with the given ID, or None if not found."""
         return self._jobs.get(job_id)
 
@@ -193,7 +191,7 @@ class JobQueue:
             self._db_update(job)
 
 
-def init_job_queue(db_path: Optional[str] = None) -> None:
+def init_job_queue(db_path: str | None = None) -> None:
     """
     Initialise the module-level job_queue singleton with the given db_path.
     Mutates the existing instance in-place so that blueprints that have already
@@ -250,7 +248,7 @@ def spawn_job(job: Job) -> None:
             cwd=os.getcwd(),
         )
         job.process = proc
-    except Exception as e:
+    except OSError as e:
         with job.lock:
             job.log.append(f"[Error] Failed to start subprocess: {e}")
             job.status = "failed"
@@ -298,7 +296,7 @@ def spawn_job(job: Job) -> None:
             if buf:
                 with job.lock:
                     job.log.append(buf)
-        except Exception as e:
+        except OSError as e:
             with job.lock:
                 job.log.append(f"[Error] Log reader error: {e}")
         finally:

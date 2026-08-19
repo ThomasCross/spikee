@@ -1,41 +1,41 @@
 # spikee/cli.py
 
 # At the top of cli.py, add these imports:
-import os
-import sys
-import shutil
 import argparse
-from . import __version__
-from dotenv import load_dotenv
+import os
+import shutil
+import sys
 from pathlib import Path
 
-from .generator import generate_dataset, generate_plugin
-from .tester import test_dataset
-from .results import (
-    analyze_results,
-    rejudge_results,
-    extract_results,
-    dataset_comparison,
-    convert_results_to_excel,
-)
-from .list import (
-    list_seeds,
-    list_datasets,
-    list_judges,
-    list_targets,
-    list_plugins,
-    list_attacks,
-    list_providers,
-)
-from .viewer.app import Viewer
+from dotenv import load_dotenv
 
+from . import __version__
 from .debug import (
-    debug_module_target,
+    debug_module_attack,
     debug_module_judge,
     debug_module_plugin,
-    debug_module_attack,
     debug_module_provider,
+    debug_module_target,
 )
+from .generator import generate_dataset, generate_plugin
+from .list import (
+    list_attacks,
+    list_datasets,
+    list_judges,
+    list_plugins,
+    list_providers,
+    list_seeds,
+    list_targets,
+)
+from .results import (
+    analyze_results,
+    convert_results_to_excel,
+    dataset_comparison,
+    extract_results,
+    rejudge_results,
+)
+from .tester import test_dataset
+from .viewer.app import Viewer
 
 banner = r"""
    _____ _____ _____ _  ________ ______
@@ -878,7 +878,7 @@ def init_workspace(force=False, include_builtin="none"):
             else:
                 shutil.copy2(item, destination)
             print(f"[init] Copied {item.name} --> {destination}")
-        except Exception as e:
+        except OSError as e:
             print(f"[init] Could not copy {item.name} to {destination}: {e}")
 
     print("[init] Local spikee workspace has been initialized.")
@@ -942,7 +942,7 @@ def copy_builtin_modules(include_option, force=False):
                     print(
                         f"[init] Copied built-in {module_type}/{file_path.name} to local workspace"
                     )
-                except Exception as e:
+                except OSError as e:
                     print(f"[init] Error copying {module_type}/{file_path.name}: {e}")
 
             if modules_copied > 0:
@@ -952,5 +952,5 @@ def copy_builtin_modules(include_option, force=False):
             else:
                 print(f"[init] No built-in {module_type} were copied")
 
-        except Exception as e:
+        except OSError as e:
             print(f"[init] Error processing {module_type}: {e}")

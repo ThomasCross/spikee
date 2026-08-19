@@ -17,8 +17,6 @@ Returns:
     str: Space-separated octal codepoint values, prefixed with 'octal ' by default.
 """
 
-from typing import List, Optional
-
 from spikee.templates.basic_plugin import BasicPlugin
 from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
@@ -41,7 +39,7 @@ class OctalEncoderPlugin(BasicPlugin):
     def transform(
         self,
         content: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
     ) -> str:
         """

@@ -1,25 +1,30 @@
 import json
+import logging
 import os
-import pandas as pd  # Required for Excel conversion
+import sys
 import traceback
+
+import pandas as pd  # Required for Excel conversion
 from tqdm import tqdm
 
 from .judge import annotate_judge_options, call_judge
 from .utilities.files import (
+    build_resource_name,
+    extract_directory_from_file_path,
+    extract_prefix_from_file_name,
+    prepare_output_file,
+    process_jsonl_input_files,
     read_jsonl_file,
     write_jsonl_file,
-    process_jsonl_input_files,
-    extract_prefix_from_file_name,
-    extract_directory_from_file_path,
-    build_resource_name,
-    prepare_output_file,
 )
 from .utilities.results import (
-    preprocess_results,
     ResultProcessor,
-    generate_query,
     extract_entries,
+    generate_query,
+    preprocess_results,
 )
+
+logger = logging.getLogger(__name__)
 from .utilities.tags import validate_and_get_tag
 
 
@@ -41,7 +46,7 @@ def analyze_results(args):
         print(
             f"[Error] false positive checks cannot be used when analyzing multiple results. Currently selected {len(result_files)} results."
         )
-        exit(1)
+        sys.exit(1)
 
     print("[Overview] Analyzing the following file(s): ")
     print(" - " + "\n - ".join(result_files))
@@ -101,7 +106,7 @@ def rejudge_results(args):
 
         # Obtain file names
         file_dir = extract_directory_from_file_path(result_file)
-        prefix, resource_name = extract_prefix_from_file_name(result_file)
+        _, resource_name = extract_prefix_from_file_name(result_file)
 
         # Obtain results to re-judge and annotate judge options
         results = read_jsonl_file(result_file)
@@ -131,7 +136,10 @@ def rejudge_results(args):
                             newest = age
                             output_file = file
 
-                    except Exception:
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Skipping invalid rejudge filename %s: %s", file, exc
+                        )
                         continue
 
             # Resume file exists
@@ -178,7 +186,7 @@ def rejudge_results(args):
                         try:
                             entry["success"] = call_judge(entry, entry["response"])
 
-                        except Exception as e:
+                        except Exception as e:  # noqa: BLE001
                             error_message = str(e)
                             entry["success"] = False
                             print("[Error] {}: {}".format(entry["id"], error_message))
@@ -220,14 +228,14 @@ def extract_results(args):
         print(
             f"[Error] Invalid category '{category}' specified for extraction. Must be one of: success, failure, error, guardrail, no-guardrail, custom."
         )
-        exit(1)
+        sys.exit(1)
 
     # Custom Category
     custom_query = None
     if args.category == "custom":
         if args.custom_search is None:
             print("[Error] Custom search requires the --custom_value to be specified.")
-            exit(1)
+            sys.exit(1)
         else:
             custom_query = generate_query(category, args.custom_search.split(","))
 

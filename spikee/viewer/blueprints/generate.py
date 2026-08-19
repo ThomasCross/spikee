@@ -8,6 +8,7 @@ import shlex
 import sys
 from pathlib import Path
 
+import markdown as md_lib
 from flask import (
     Blueprint,
     Response,
@@ -18,8 +19,8 @@ from flask import (
     session,
     url_for,
 )
-import markdown as md_lib
 
+from spikee.generator import resolve_seed_folder
 from spikee.utilities.files import read_jsonl_file
 from spikee.utilities.modules import (
     collect_datasets,
@@ -29,10 +30,9 @@ from spikee.utilities.modules import (
     get_options_from_module,
     load_module_from_path,
 )
-from spikee.viewer.blueprints._shared import module_tags as _module_tags
 from spikee.viewer.blueprints import _cache as _module_cache
 from spikee.viewer.blueprints._forms import FormValidationError, GenerateForm
-from spikee.generator import resolve_seed_folder
+from spikee.viewer.blueprints._shared import module_tags as _module_tags
 from spikee.viewer.job_queue import job_queue, spawn_job
 
 generate_bp = Blueprint("generate", __name__)
@@ -100,7 +100,7 @@ def _collect_plugins() -> dict:
                 option_list, llm_req = opts
                 options = list(option_list) if option_list else []
                 llm_required = bool(llm_req)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         return {
             "name": name,
@@ -127,7 +127,7 @@ def _collect_plugins_detail() -> list[dict]:
         options     — list of option strings advertised by the module, or []
         llm_required — bool; True if any option requires an LLM call
     """
-    _all, local_names, builtin_names = collect_modules("plugins")
+    _all, local_names, _ = collect_modules("plugins")
     local_set = set(local_names)
     exclude_tags = {"Single-Turn"}
 
@@ -151,7 +151,7 @@ def _collect_plugins_detail() -> list[dict]:
                 option_list, llm_req = opts
                 options = list(option_list) if option_list else []
                 llm_required = bool(llm_req)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
         plugins.append(
@@ -201,7 +201,7 @@ def _load_seed_detail(seed_name: str) -> dict | None:
     try:
         # collect_seeds() returns bare names; resolve_seed_folder expects "datasets/<name>"
         folder = Path(str(resolve_seed_folder(f"datasets/{seed_name}")))
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
     files = []
@@ -213,7 +213,7 @@ def _load_seed_detail(seed_name: str) -> dict | None:
         if fname.endswith(".jsonl"):
             try:
                 rows = read_jsonl_file(str(fpath))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 rows = []
             entries = len(rows)
             preview = [_normalize_row(r, i) for i, r in enumerate(rows)]
@@ -239,7 +239,7 @@ def _load_seed_detail(seed_name: str) -> dict | None:
                     }
                     for i, cfg in enumerate(configs)
                 ]
-            except Exception:
+            except Exception:  # noqa: BLE001
                 entries = "\u2014"
                 preview = []
 
@@ -314,7 +314,7 @@ def _load_seed_detail(seed_name: str) -> dict | None:
                 readme_html,
                 flags=_re.IGNORECASE,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             readme_html = None
 
     scripts = sorted(
@@ -341,7 +341,7 @@ def _load_dataset_entries(dataset_name: str, page: int = 1) -> dict | None:
         return None
     try:
         rows = read_jsonl_file(str(path))
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
     total = len(rows)
@@ -480,6 +480,7 @@ def plugins_run() -> Response:
         {outputs: [str], count: int, error: str|null}
     """
     from flask import jsonify
+
     from spikee.generator import apply_plugin, load_plugins, parse_plugin_options
 
     data = request.get_json(silent=True) or {}
@@ -515,7 +516,7 @@ def plugins_run() -> Response:
                 "error": f"Failed to load plugin(s): {pipeline_str}",
             }
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return jsonify({"outputs": [], "count": 0, "error": str(exc)})
 
     if not plugins_loaded:
@@ -531,7 +532,7 @@ def plugins_run() -> Response:
             exclude_patterns=exclude_patterns,
             plugin_option_map=plugin_option_map,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return jsonify({"outputs": [], "count": 0, "error": str(exc)})
 
     # Coerce Content objects to plain strings
@@ -613,9 +614,9 @@ def dataset_rename(dataset_name: str) -> Response:
 @generate_bp.route("/seeds/<seed_name>/clone", methods=["POST"])
 def seed_clone(seed_name: str) -> Response:
     """Clone an entire seed folder to a new name inside datasets/."""
-    from flask import jsonify
-
     import shutil
+
+    from flask import jsonify
 
     datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
     src_dir = _resolve_seed_dir(seed_name, datasets_dir)
@@ -763,7 +764,7 @@ def _resolve_editable_path(rel_path: str, base_dir: Path) -> Path | None:
     """Resolve rel_path within base_dir; return None on traversal or bad extension."""
     try:
         resolved = (base_dir / rel_path).resolve()
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     if not resolved.is_relative_to(base_dir.resolve()):
         return None
@@ -778,7 +779,7 @@ def _resolve_seed_dir(seed_name: str, base_dir: Path) -> Path | None:
         return None
     try:
         resolved = (base_dir / seed_name).resolve()
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     if not resolved.is_relative_to(base_dir.resolve()):
         return None
@@ -844,7 +845,7 @@ def seed_delete_line(seed_name: str, filename: str) -> Response:
     datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
     try:
         seed_folder = Path(str(resolve_seed_folder(f"datasets/{seed_name}")))
-    except Exception:
+    except Exception:  # noqa: BLE001
         abort(404)
     if not seed_folder.resolve().is_relative_to(datasets_dir):
         abort(403)
@@ -967,7 +968,7 @@ def _seed_jsonl_path(seed_name: str, filename: str) -> Path:
     datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
     try:
         seed_folder = Path(str(resolve_seed_folder(f"datasets/{seed_name}")))
-    except Exception:
+    except Exception:  # noqa: BLE001
         abort(404)
     if not seed_folder.resolve().is_relative_to(datasets_dir):
         abort(403, description="Built-in seeds are not editable.")
@@ -1057,7 +1058,7 @@ def seed_edit(seed_name: str, filename: str) -> Response | str:
     # Resolve the seed folder first so we can locate the file inside it.
     try:
         seed_folder = Path(str(resolve_seed_folder(f"datasets/{seed_name}")))
-    except Exception:
+    except Exception:  # noqa: BLE001
         abort(404)
 
     # Reject built-in seeds (outside CWD/datasets/) and path traversal.

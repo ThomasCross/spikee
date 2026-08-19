@@ -1,8 +1,7 @@
-from spikee.templates.provider import ProviderError
-from spikee.providers.custom import AnyLLMCustomProvider
-from typing import Union, Dict
 import os
 
+from spikee.providers.custom import AnyLLMCustomProvider
+from spikee.templates.provider import ProviderError
 from spikee.utilities.llm_message import AIMessage, MessageHint
 
 
@@ -16,7 +15,7 @@ class AnyLLMGoogleProvider(AnyLLMCustomProvider):
         return "gemini-2.5-flash"
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {
             # Gemini 3 (Latest)
             "gemini-3.1-pro": "gemini-3.1-pro-preview",
@@ -40,7 +39,7 @@ class AnyLLMGoogleProvider(AnyLLMCustomProvider):
         return "https://generativelanguage.googleapis.com/v1beta/openai/"
 
     @property
-    def api_key(self) -> Union[str, None]:
+    def api_key(self) -> str | None:
         return os.getenv("GOOGLE_API_KEY", None)
 
     def response_validation(self, messages: MessageHint, response: AIMessage) -> None:

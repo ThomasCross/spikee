@@ -19,15 +19,16 @@ from flask import (
     url_for,
 )
 
-from spikee.utilities.modules import collect_datasets, collect_modules
 from spikee.utilities.modules import (
+    collect_datasets,
+    collect_modules,
     get_description_from_module,
     get_options_from_module,
     load_module_from_path,
 )
-from spikee.viewer.blueprints._shared import module_tags as _module_tags
 from spikee.viewer.blueprints import _cache as _module_cache
 from spikee.viewer.blueprints._forms import FormValidationError, TestForm
+from spikee.viewer.blueprints._shared import module_tags as _module_tags
 from spikee.viewer.job_queue import job_queue, spawn_job
 
 test_bp = Blueprint("test", __name__)
@@ -69,7 +70,7 @@ def _collect_modules_for_target(module_type: str, rich: bool = False) -> dict:
                     option_list, llm_req = opts
                     options = list(option_list) if option_list else []
                     llm_required = bool(llm_req)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
             entry["description"] = description
             entry["options"] = options
@@ -199,9 +200,9 @@ def workshop_run() -> Response:
         {response: str, guardrail: bool, error: str|null,
          log_file: str|null, log_count: int, log_error: str|null}
     """
-    from spikee.utilities.hinting import get_content
-    from spikee.utilities.files import append_jsonl_entry, build_file_name
     from spikee.generator import apply_plugin, load_plugins, parse_plugin_options
+    from spikee.utilities.files import append_jsonl_entry, build_file_name
+    from spikee.utilities.hinting import get_content
 
     data = request.get_json(silent=True) or {}
     target_name = (data.get("target") or "").strip()
@@ -262,7 +263,7 @@ def workshop_run() -> Response:
                     "log_error": None,
                 }
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return jsonify(
                 {
                     "response": None,
@@ -286,7 +287,7 @@ def workshop_run() -> Response:
                 )
                 if results:
                     text = str(get_content(results[0]))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 return jsonify(
                     {
                         "response": None,
@@ -301,7 +302,7 @@ def workshop_run() -> Response:
     # ── Call target ───────────────────────────────────────────────────────────
     try:
         target_mod = load_module_from_path(target_name, "targets")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return jsonify(
             {
                 "response": None,
@@ -329,7 +330,7 @@ def workshop_run() -> Response:
         else:
             response_str = str(get_content(raw))
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         if (
             type(exc).__name__ == "GuardrailTrigger"
             or "guardrail" in type(exc).__name__.lower()
@@ -391,7 +392,7 @@ def workshop_run() -> Response:
             log_file_name = os.path.basename(log_path)
             log_count = entry_count
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             log_error = f"Log write failed: {exc}"
 
     if call_error:
@@ -481,6 +482,7 @@ def manual_start() -> str:
 def manual_start_post() -> Response:
     """Create a manual job and redirect to the session page."""
     import random as _random
+
     from spikee.utilities.files import build_file_name
 
     dataset = (request.form.get("dataset") or "").strip()
@@ -602,8 +604,9 @@ def manual_session(job_id: str) -> Response | str:
 def manual_session_post(job_id: str) -> Response:
     """Save the current entry's response and advance to the next."""
     import time as _time
+
+    from spikee.judge import annotate_judge_options, call_judge
     from spikee.utilities.files import append_jsonl_entry
-    from spikee.judge import call_judge, annotate_judge_options
 
     job = job_queue.get(job_id)
     if job is None or job.type != "manual":
@@ -637,7 +640,7 @@ def manual_session_post(job_id: str) -> Response:
                     0
                 ]
                 success = bool(call_judge(annotated, response_text))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
     result_entry = {

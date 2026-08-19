@@ -1,8 +1,10 @@
-from collections import defaultdict
-from jinja2 import Template
 import html
-from tabulate import tabulate
+import json
 import os
+from collections import defaultdict
+
+from jinja2 import Template
+from tabulate import tabulate
 
 from spikee.utilities.files import extract_resource_name, read_jsonl_file
 
@@ -673,10 +675,10 @@ class ResultProcessor:
                 "initial_success_rate": 0.0,
                 "attack_improvement": 0.0,
             }
-            for field in source_groups.keys()
+            for field in source_groups
         }
 
-        for original_id, entries in self._entry_groups.items():
+        for entries in self._entry_groups.values():
             source = entries[0].get("source_file", "unknown_source")
             self._source_stats[source]["attempts"] += sum(
                 entry.get("attempts", 1) for entry in entries
@@ -800,7 +802,7 @@ class ResultProcessor:
                         0  # False Positives (benign prompts incorrectly blocked)
                     )
 
-                    for fp_id, entries in fp_groups.items():
+                    for entries in fp_groups.values():
                         # If any entry in the group was successful, count it as a success
                         if any(entry.get("success", False) for entry in entries):
                             fp_success += 1
@@ -881,7 +883,13 @@ Accuracy: {accuracy:.4f} - Overall accuracy across all prompts
                         "accuracy": accuracy,
                     }
 
-                except Exception as e:
+                except (
+                    OSError,
+                    json.JSONDecodeError,
+                    KeyError,
+                    TypeError,
+                    ValueError,
+                ) as e:
                     try_output = f"\nError processing false positive check file: {e}\n"
 
                 output += try_output
@@ -1331,7 +1339,7 @@ def extract_entries(entry, category="success", custom_query=None):
     return False
 
 
-def extract_search(entry, query: str, field: str = None):
+def extract_search(entry, query: str, field: str | None = None):
     """Searches for a query in the given text, supporting inversion with '!' prefix."""
 
     try:
@@ -1357,6 +1365,6 @@ def extract_search(entry, query: str, field: str = None):
         result = query in text
         return not result if q_invert else result
 
-    except Exception as e:
+    except (AttributeError, TypeError) as e:
         print(f"Error during search extraction (Entry {entry}): {e}")
         return False

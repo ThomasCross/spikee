@@ -1,13 +1,14 @@
-import os
 import logging
+import os
+from typing import Any
+
 from any_llm import AnyLLM
 from any_llm.logging import logger as any_llm_logger
-from typing import Union, Any, Dict
 
 from spikee.templates.provider import Provider
-from spikee.utilities.hinting import ModuleDescriptionHint
 from spikee.utilities.enums import ModuleTag
-from spikee.utilities.llm_message import format_messages, AIMessage, MessageHint
+from spikee.utilities.hinting import ModuleDescriptionHint
+from spikee.utilities.llm_message import AIMessage, MessageHint, format_messages
 
 
 class AnyLLMBedrockProvider(Provider):
@@ -31,7 +32,7 @@ class AnyLLMBedrockProvider(Provider):
         return "claude45-sonnet"
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {
             # Claude 3.5
             "claude35-us-haiku": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
@@ -57,8 +58,8 @@ class AnyLLMBedrockProvider(Provider):
     def setup(
         self,
         model: str,
-        max_tokens: Union[int, None] = None,
-        temperature: Union[float, None] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **kwargs,
     ):
         self.model = model
@@ -100,7 +101,7 @@ class AnyLLMBedrockProvider(Provider):
                 "[Import Error] Provider Module 'bedrock' is missing required packages for AWS Bedrock. Please run `pip install spikee[bedrock]` to install them."
             )
 
-        options_kwargs: Dict[str, Any] = {}
+        options_kwargs: dict[str, Any] = {}
         if self.max_tokens is not None:
             options_kwargs["max_tokens"] = self.max_tokens
 

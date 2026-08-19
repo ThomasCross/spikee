@@ -19,20 +19,19 @@ Authentication via environment variables:
 import asyncio
 import base64
 import os
-from typing import Optional, Set, Union, List, Dict
 
 from spikee.templates.provider import Provider
+from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import (
+    Audio,
     ModuleDescriptionHint,
     ModuleOptionsHint,
-    Audio,
 )
-from spikee.utilities.enums import ModuleTag
 from spikee.utilities.llm_message import (
     AIMessage,
     HumanMessage,
-    single_message,
     MessageHint,
+    single_message,
 )
 
 
@@ -41,8 +40,8 @@ class AWSTranscribeSTTProvider(Provider):
 
     def __init__(self):
         super().__init__()
-        self.region: Optional[str] = None
-        self.language_code: Optional[str] = None
+        self.region: str | None = None
+        self.language_code: str | None = None
         self.sample_rate_hz: int = 16000
         self._credentials: dict = {}
 
@@ -51,28 +50,28 @@ class AWSTranscribeSTTProvider(Provider):
         return "transcribe"
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {
             "transcribe": "transcribe",
         }
 
     @property
-    def audio_formats(self) -> Set[str]:
+    def audio_formats(self) -> set[str]:
         return {"pcm", "flac", "wav", "mp3", "ogg"}
 
     def setup(
         self,
         model: str,
-        max_tokens: Union[int, None] = None,
-        temperature: Union[float, None] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **additional_kwargs,
     ) -> None:
         self.language_code = additional_kwargs.get("language_code", "en-GB")
         self.sample_rate_hz = int(additional_kwargs.get("sample_rate_hz", 16000))
 
         try:
-            import boto3
             import amazon_transcribe  # noqa: F401 - imported to validate package availability
+            import boto3
         except ImportError as exc:
             raise ImportError(
                 "[Import Error] Provider Module 'aws_transcribe_stt' is missing required packages. "
@@ -82,7 +81,7 @@ class AWSTranscribeSTTProvider(Provider):
         self.region = os.getenv("AWS_DEFAULT_REGION", None)
 
         if self.region is None:
-            raise ValueError(
+            raise TypeError(
                 "AWS_DEFAULT_REGION environment variable must be set for AWS Transcribe STT Provider."
             )
 
@@ -137,7 +136,7 @@ class AWSTranscribeSTTProvider(Provider):
             media_encoding=media_encoding,
         )
 
-        transcript_parts: List[str] = []
+        transcript_parts: list[str] = []
 
         class _EventHandler(TranscriptResultStreamHandler):
             async def handle_transcript_event(self, transcript_event: TranscriptEvent):
@@ -168,7 +167,7 @@ class AWSTranscribeSTTProvider(Provider):
         content = msg.content
 
         if not isinstance(content, Audio):
-            raise ValueError(
+            raise TypeError(
                 "AWS Transcribe STT Provider requires a user message containing base64-encoded audio."
             )
 
@@ -189,6 +188,7 @@ class AWSTranscribeSTTProvider(Provider):
 
 if __name__ == "__main__":
     import sys
+
     from dotenv import load_dotenv
 
     load_dotenv()

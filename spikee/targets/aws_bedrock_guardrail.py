@@ -1,12 +1,13 @@
-from dotenv import load_dotenv
-from typing import Optional
 import os
+
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError
+from dotenv import load_dotenv
 
 from spikee.templates.target import Target
+from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.modules import parse_options
-from spikee.utilities.enums import ModuleTag
 
 
 class AWSBedrockGuardrailTarget(Target):
@@ -49,15 +50,15 @@ class AWSBedrockGuardrailTarget(Target):
                         ):
                             return True  # Return True only if criteria are met
                 return True  # If action is intervened but not specifically blocked, still return True
-        except Exception as e:
+        except (BotoCoreError, ClientError, KeyError, TypeError, ValueError) as e:
             print(f"Error during guardrail detection: {e}")
         return False  # Default to False if no valid result
 
     def process_input(
         self,
         input_text: str,
-        system_message: Optional[str] = None,
-        target_options: Optional[str] = None,
+        system_message: str | None = None,
+        target_options: str | None = None,
     ) -> bool:
         """
         Test if input text bypasses AWS Bedrock guardrail.
@@ -68,15 +69,11 @@ class AWSBedrockGuardrailTarget(Target):
         opts = parse_options(target_options)
         version = opts.get("version", "DRAFT")
 
-        try:
-            attack_detected = self.detect_prompt_injection_result(
-                input_text, version=version
-            )
+        attack_detected = self.detect_prompt_injection_result(
+            input_text, version=version
+        )
 
-            return not attack_detected
-        except Exception as e:
-            print(f"Error in guardrail processing: {e}")
-            raise
+        return not attack_detected
 
 
 if __name__ == "__main__":

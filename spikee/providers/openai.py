@@ -1,10 +1,11 @@
-from spikee.templates.provider import Provider
-from spikee.utilities.hinting import ModuleDescriptionHint
-from spikee.utilities.enums import ModuleTag
-from spikee.utilities.llm_message import format_messages, AIMessage, MessageHint
+from typing import Any
 
 from any_llm import AnyLLM
-from typing import Union, Any, Dict, List
+
+from spikee.templates.provider import Provider
+from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint
+from spikee.utilities.llm_message import AIMessage, MessageHint, format_messages
 
 
 class AnyLLMOpenAIProvider(Provider):
@@ -15,7 +16,7 @@ class AnyLLMOpenAIProvider(Provider):
         return "gpt-4o"
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {
             # GPT-5.4 (Latest)
             "gpt-5.4": "gpt-5.4",
@@ -41,14 +42,14 @@ class AnyLLMOpenAIProvider(Provider):
         }
 
     @property
-    def logprobs_models(self) -> List[str]:
+    def logprobs_models(self) -> list[str]:
         return ["gpt-4o", "gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini"]
 
     def setup(
         self,
         model: str,
-        max_tokens: Union[int, None] = None,
-        temperature: Union[float, None] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **kwargs,
     ):
         self.model = model
@@ -67,7 +68,7 @@ class AnyLLMOpenAIProvider(Provider):
                 "[Import Error] Provider Module 'openai' is missing required packages for OpenAI. Please run `pip install spikee[openai]` to install them."
             )
 
-        options_kwargs: Dict[str, Any] = {}
+        options_kwargs: dict[str, Any] = {}
         if self.max_tokens is not None:
             options_kwargs["max_tokens"] = self.max_tokens
 

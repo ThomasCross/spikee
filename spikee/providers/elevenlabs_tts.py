@@ -9,17 +9,16 @@ Additional Args:
 
 import base64
 import os
-from typing import Callable, Set, Union, Dict
-
+from collections.abc import Callable
 
 from spikee.templates.streaming_provider import StreamingProvider
-from spikee.utilities.hinting import ModuleDescriptionHint, Audio, get_content
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import Audio, ModuleDescriptionHint, get_content
 from spikee.utilities.llm_message import (
-    single_message,
     AIMessage,
     HumanMessage,
     MessageHint,
+    single_message,
 )
 
 
@@ -31,7 +30,7 @@ class ElevenLabsTTSProvider(StreamingProvider):
         return "eleven_flash_v2_5"
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {
             "eleven_flash_v2_5": "eleven_flash_v2_5",
             "eleven_turbo_v2_5": "eleven_turbo_v2_5",
@@ -40,7 +39,7 @@ class ElevenLabsTTSProvider(StreamingProvider):
         }
 
     @property
-    def audio_formats(self) -> Set[str]:
+    def audio_formats(self) -> set[str]:
         return {
             "mp3_44100_128",
             "mp3_22050_32",
@@ -53,8 +52,8 @@ class ElevenLabsTTSProvider(StreamingProvider):
     def setup(
         self,
         model: str,
-        max_tokens: Union[int, None] = None,
-        temperature: Union[float, None] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **additional_kwargs,
     ) -> None:
         self.model = model
@@ -134,6 +133,7 @@ class ElevenLabsTTSProvider(StreamingProvider):
 
 if __name__ == "__main__":
     import sys
+
     from dotenv import load_dotenv
 
     load_dotenv()

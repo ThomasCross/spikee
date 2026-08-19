@@ -16,14 +16,13 @@ from pathlib import Path
 
 from flask import Flask, render_template
 
-from spikee.viewer.blueprints.results import results_bp
-from spikee.viewer.blueprints.generate import generate_bp
-from spikee.viewer.blueprints.test import test_bp
-from spikee.viewer.blueprints.jobs import jobs_bp
-from spikee.viewer.blueprints.settings import settings_bp
 from spikee.viewer.blueprints import _cache as _module_cache
+from spikee.viewer.blueprints.generate import generate_bp
+from spikee.viewer.blueprints.jobs import jobs_bp
+from spikee.viewer.blueprints.results import results_bp
+from spikee.viewer.blueprints.settings import settings_bp
+from spikee.viewer.blueprints.test import test_bp
 from spikee.viewer.job_queue import init_job_queue
-
 
 # Directories that must exist in CWD for it to be considered a valid workspace
 _WORKSPACE_MARKERS = ("datasets", "results", "targets", "attacks", "plugins")
