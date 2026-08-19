@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from flask import Blueprint, Response, current_app, jsonify, render_template, request, session
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+    session,
+)
 
 settings_bp = Blueprint("settings", __name__)
 

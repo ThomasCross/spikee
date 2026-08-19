@@ -151,5 +151,3 @@ def log(job_id: str) -> Response:
         log_snapshot = list(job.log)
         status = job.status
     return jsonify({"status": status, "log": log_snapshot})
-
-

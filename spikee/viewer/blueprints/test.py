@@ -453,6 +453,7 @@ def _read_jsonl_entry_at(path: str, index: int) -> dict | None:
                     continue
                 if logical_index == index:
                     import json as _json
+
                     return _json.loads(line)
                 logical_index += 1
     except (OSError, ValueError):
@@ -463,6 +464,7 @@ def _read_jsonl_entry_at(path: str, index: int) -> dict | None:
 def _manual_result_key(output_file: str) -> str:
     """Convert an absolute output_file path to a results-viewer key."""
     from spikee.utilities.files import extract_resource_name
+
     return extract_resource_name(output_file)
 
 
@@ -515,7 +517,11 @@ def manual_start_post() -> Response:
 
     # Compute the ordered list of dataset line indices to process.
     if sample is not None:
-        seed = _random.randint(0, 2**32 - 1) if sample_seed_str == "random" else int(sample_seed_str)
+        seed = (
+            _random.randint(0, 2**32 - 1)
+            if sample_seed_str == "random"
+            else int(sample_seed_str)
+        )
         _random.seed(seed)
         size = round(total_lines * sample)
         entry_indices = sorted(_random.sample(range(total_lines), size))
@@ -524,7 +530,12 @@ def manual_start_post() -> Response:
 
     total = len(entry_indices) if entry_indices is not None else total_lines
 
-    filename = build_file_name("results", "manual", os.path.splitext(dataset)[0].replace("/", "_").replace("\\", "_"), tag)
+    filename = build_file_name(
+        "results",
+        "manual",
+        os.path.splitext(dataset)[0].replace("/", "_").replace("\\", "_"),
+        tag,
+    )
     results_dir = os.path.join(os.getcwd(), "results")
     os.makedirs(results_dir, exist_ok=True)
     output_file = os.path.join(results_dir, filename)
@@ -622,7 +633,9 @@ def manual_session_post(job_id: str) -> Response:
         else:
             # Use the entry's own judge, optionally with session-level judge_options.
             try:
-                annotated = annotate_judge_options([entry], meta.get("judge_options"))[0]
+                annotated = annotate_judge_options([entry], meta.get("judge_options"))[
+                    0
+                ]
                 success = bool(call_judge(annotated, response_text))
             except Exception:
                 pass

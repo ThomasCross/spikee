@@ -576,7 +576,9 @@ def dataset_clone(dataset_name: str) -> Response:
     import shutil
 
     shutil.copy2(file_path, new_path)
-    return jsonify({"url": url_for("generate.dataset_detail", dataset_name=new_name)}), 201
+    return jsonify(
+        {"url": url_for("generate.dataset_detail", dataset_name=new_name)}
+    ), 201
 
 
 @generate_bp.route("/datasets/<path:dataset_name>/rename", methods=["POST"])
@@ -603,7 +605,9 @@ def dataset_rename(dataset_name: str) -> Response:
         file_path.rename(new_path)
     except FileExistsError:
         abort(409, description="A dataset with that name already exists.")
-    return jsonify({"url": url_for("generate.dataset_detail", dataset_name=new_name)}), 200
+    return jsonify(
+        {"url": url_for("generate.dataset_detail", dataset_name=new_name)}
+    ), 200
 
 
 @generate_bp.route("/seeds/<seed_name>/clone", methods=["POST"])
@@ -677,7 +681,10 @@ def seed_detail(seed_name: str) -> str:
     datasets_dir = (Path(os.getcwd()) / "datasets").resolve()
     is_local = Path(detail["path"]).resolve().is_relative_to(datasets_dir)
     return render_template(
-        "generate/seed_detail.html", seed_name=seed_name, detail=detail, is_local=is_local
+        "generate/seed_detail.html",
+        seed_name=seed_name,
+        detail=detail,
+        is_local=is_local,
     )
 
 
@@ -708,7 +715,11 @@ def seed_script_run(seed_name: str, script_name: str) -> Response:
         abort(400, description=f"Invalid command: {exc}")
 
     script_token_index = next(
-        (i for i, token in enumerate(tokens) if Path(token.strip('"')).name == script_name),
+        (
+            i
+            for i, token in enumerate(tokens)
+            if Path(token.strip('"')).name == script_name
+        ),
         None,
     )
     if script_token_index is None:
@@ -814,7 +825,10 @@ def _parse_line_numbers(data: dict) -> list[int]:
     values = data.get("line_numbers")
     if not isinstance(values, list) or not values:
         abort(400, description="line_numbers must be a non-empty list.")
-    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in values):
+    if any(
+        isinstance(value, bool) or not isinstance(value, int) or value < 0
+        for value in values
+    ):
         abort(400, description="line_numbers must contain non-negative integers.")
     if len(set(values)) != len(values):
         abort(400, description="line_numbers must not contain duplicates.")
@@ -841,7 +855,9 @@ def seed_delete_line(seed_name: str, filename: str) -> Response:
     rows = _jsonl_rows(file_path)
     if any(line_no >= len(rows) for line_no in line_numbers):
         abort(404, description="One or more rows no longer exist.")
-    _write_jsonl_rows(file_path, [row for i, row in enumerate(rows) if i not in line_numbers])
+    _write_jsonl_rows(
+        file_path, [row for i, row in enumerate(rows) if i not in line_numbers]
+    )
     return Response(status=204)
 
 
@@ -856,7 +872,9 @@ def dataset_delete_line(dataset_name: str) -> Response:
     rows = _jsonl_rows(file_path)
     if any(line_no >= len(rows) for line_no in line_numbers):
         abort(404, description="One or more rows no longer exist.")
-    _write_jsonl_rows(file_path, [row for i, row in enumerate(rows) if i not in line_numbers])
+    _write_jsonl_rows(
+        file_path, [row for i, row in enumerate(rows) if i not in line_numbers]
+    )
     return Response(status=204)
 
 
@@ -874,11 +892,19 @@ def _render_entry_editor(
     rows = _jsonl_rows(file_path)
     if is_new:
         line_no = len(rows)
-        formatted = content if content is not None else _json.dumps({}, indent=2, ensure_ascii=False)
+        formatted = (
+            content
+            if content is not None
+            else _json.dumps({}, indent=2, ensure_ascii=False)
+        )
     else:
         if line_no is None or line_no < 0 or line_no >= len(rows):
             abort(404, description="JSONL row not found.")
-        formatted = content if content is not None else _json.dumps(rows[line_no], indent=2, ensure_ascii=False)
+        formatted = (
+            content
+            if content is not None
+            else _json.dumps(rows[line_no], indent=2, ensure_ascii=False)
+        )
     return render_template(
         "generate/edit_file.html",
         filename=filename,
@@ -893,15 +919,38 @@ def _render_entry_editor(
     )
 
 
-def _entry_post(file_path: Path, line_no: int | None, is_new: bool, content: str, back_url: str, filename: str) -> Response | str:
+def _entry_post(
+    file_path: Path,
+    line_no: int | None,
+    is_new: bool,
+    content: str,
+    back_url: str,
+    filename: str,
+) -> Response | str:
     import json as _json
 
     try:
         value = _json.loads(content)
     except _json.JSONDecodeError as exc:
-        return _render_entry_editor(file_path, filename, back_url, line_no, content, f"JSON error: {exc}", is_new)
+        return _render_entry_editor(
+            file_path,
+            filename,
+            back_url,
+            line_no,
+            content,
+            f"JSON error: {exc}",
+            is_new,
+        )
     if not isinstance(value, dict):
-        return _render_entry_editor(file_path, filename, back_url, line_no, content, "An entry must be a JSON object.", is_new)
+        return _render_entry_editor(
+            file_path,
+            filename,
+            back_url,
+            line_no,
+            content,
+            "An entry must be a JSON object.",
+            is_new,
+        )
 
     rows = _jsonl_rows(file_path)
     if is_new:
@@ -928,13 +977,22 @@ def _seed_jsonl_path(seed_name: str, filename: str) -> Path:
     return file_path
 
 
-@generate_bp.route("/seeds/<seed_name>/entries/<int:line_no>/edit", methods=["GET", "POST"])
+@generate_bp.route(
+    "/seeds/<seed_name>/entries/<int:line_no>/edit", methods=["GET", "POST"]
+)
 def seed_entry_edit(seed_name: str, line_no: int) -> Response | str:
     filename = request.args.get("filename", "")
     file_path = _seed_jsonl_path(seed_name, filename)
     back_url = url_for("generate.seed_detail", seed_name=seed_name)
     if request.method == "POST":
-        return _entry_post(file_path, line_no, False, request.form.get("content", ""), back_url, filename)
+        return _entry_post(
+            file_path,
+            line_no,
+            False,
+            request.form.get("content", ""),
+            back_url,
+            filename,
+        )
     return _render_entry_editor(file_path, filename, back_url, line_no)
 
 
@@ -943,7 +1001,9 @@ def seed_entry_new(seed_name: str, filename: str) -> Response | str:
     file_path = _seed_jsonl_path(seed_name, filename)
     back_url = url_for("generate.seed_detail", seed_name=seed_name)
     if request.method == "POST":
-        return _entry_post(file_path, None, True, request.form.get("content", ""), back_url, filename)
+        return _entry_post(
+            file_path, None, True, request.form.get("content", ""), back_url, filename
+        )
     return _render_entry_editor(file_path, filename, back_url, None, is_new=True)
 
 
@@ -955,12 +1015,21 @@ def _dataset_jsonl_path(dataset_name: str) -> Path:
     return file_path
 
 
-@generate_bp.route("/datasets/<path:dataset_name>/entries/<int:line_no>/edit", methods=["GET", "POST"])
+@generate_bp.route(
+    "/datasets/<path:dataset_name>/entries/<int:line_no>/edit", methods=["GET", "POST"]
+)
 def dataset_entry_edit(dataset_name: str, line_no: int) -> Response | str:
     file_path = _dataset_jsonl_path(dataset_name)
     back_url = url_for("generate.dataset_detail", dataset_name=dataset_name)
     if request.method == "POST":
-        return _entry_post(file_path, line_no, False, request.form.get("content", ""), back_url, dataset_name)
+        return _entry_post(
+            file_path,
+            line_no,
+            False,
+            request.form.get("content", ""),
+            back_url,
+            dataset_name,
+        )
     return _render_entry_editor(file_path, dataset_name, back_url, line_no)
 
 
@@ -969,7 +1038,14 @@ def dataset_entry_new(dataset_name: str) -> Response | str:
     file_path = _dataset_jsonl_path(dataset_name)
     back_url = url_for("generate.dataset_detail", dataset_name=dataset_name)
     if request.method == "POST":
-        return _entry_post(file_path, None, True, request.form.get("content", ""), back_url, dataset_name)
+        return _entry_post(
+            file_path,
+            None,
+            True,
+            request.form.get("content", ""),
+            back_url,
+            dataset_name,
+        )
     return _render_entry_editor(file_path, dataset_name, back_url, None, is_new=True)
 
 
@@ -1003,8 +1079,15 @@ def seed_edit(seed_name: str, filename: str) -> Response | str:
     stats = _file_stats(file_path)
     return render_template(
         "generate/edit_file.html",
-        filename=filename, content=content, back_url=back_url,
-        error=None, mode="raw", is_new=False, line_no=None, total_entries=None, **stats,
+        filename=filename,
+        content=content,
+        back_url=back_url,
+        error=None,
+        mode="raw",
+        is_new=False,
+        line_no=None,
+        total_entries=None,
+        **stats,
     )
 
 
@@ -1030,8 +1113,15 @@ def dataset_edit(dataset_name: str) -> Response | str:
     stats = _file_stats(file_path)
     return render_template(
         "generate/edit_file.html",
-        filename=dataset_name, content=content, back_url=back_url,
-        error=None, mode="raw", is_new=False, line_no=None, total_entries=None, **stats,
+        filename=dataset_name,
+        content=content,
+        back_url=back_url,
+        error=None,
+        mode="raw",
+        is_new=False,
+        line_no=None,
+        total_entries=None,
+        **stats,
     )
 
 

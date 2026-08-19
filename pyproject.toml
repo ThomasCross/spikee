@@ -35,3 +35,6 @@ spikee = [ "data/**/*", "viewer/**/*",]
 [tool.setuptools.packages.find]
 include = [ "spikee*",]
 exclude = [ "datasets*", "results*", "targets*", "plugins*", "attacks*", "judges*", "templates*", "utilities*",]
+
+[tool.ruff]
+extend-exclude = [ ".github/*",]
