@@ -8,15 +8,13 @@ Usage:
   spikee test --plugins llm_poetry_jailbreaker --plugin-options "llm_poetry_jailbreaker:model=openai/gpt-4o,variants=5"
 """
 
-from typing import List, Dict, Optional, Union
-
+from spikee.attacks.llm_poetry_jailbreaker import SPIKEE_LLM_POETRY_JAILBREAKER_PROMPT
 from spikee.templates.plugin import Plugin
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.llm import get_llm
 from spikee.utilities.llm_message import HumanMessage
-from spikee.attacks.llm_poetry_jailbreaker import SPIKEE_LLM_POETRY_JAILBREAKER_PROMPT
-from spikee.utilities.modules import parse_options, extract_json_or_fail
+from spikee.utilities.modules import extract_json_or_fail, parse_options
 
 
 class LLMPoetryJailbreaker(Plugin):
@@ -40,7 +38,7 @@ class LLMPoetryJailbreaker(Plugin):
         return int(opts.get("variants", self.VARIANTS))
 
     def _generate_jailbreak_attack(
-        self, llm, objective: str, previous_attempts: List[Dict]
+        self, llm, objective: str, previous_attempts: list[dict]
     ) -> str:
         """Generate a jailbreak attack using the LLM."""
         # Format previous attempts for the prompt
@@ -70,7 +68,7 @@ class LLMPoetryJailbreaker(Plugin):
         response = llm.invoke([prompt]).content.strip()
 
         if not isinstance(response, str):
-            raise RuntimeError("LLM response is not a string as expected.")
+            raise TypeError("LLM response is not a string as expected.")
 
         obj = extract_json_or_fail(response)
         attack_prompt = obj.get("attack_prompt", "")
@@ -81,9 +79,9 @@ class LLMPoetryJailbreaker(Plugin):
     def transform(
         self,
         content: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
-    ) -> Union[str, List[str]]:
+    ) -> str | list[str]:
         opts = parse_options(plugin_option)
         llm_model = opts.get("model", self.DEFAULT_MODEL)
         variants = int(opts.get("variants", self.VARIANTS))
@@ -98,7 +96,7 @@ class LLMPoetryJailbreaker(Plugin):
                 attack_prompts.append(
                     self._generate_jailbreak_attack(llm, content, previous_attempts)
                 )
-            except Exception as e:
-                print(f"[LLMPoetryJailbreaker] Error generating prompt {i}: {str(e)}")
+            except Exception as e:  # noqa: BLE001
+                print(f"[LLMPoetryJailbreaker] Error generating prompt {i}: {e!s}")
 
         return attack_prompts

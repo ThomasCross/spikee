@@ -6,19 +6,17 @@ Additional Args:
 """
 
 import base64
-from io import BytesIO
 import os
-from typing import Union, Dict
-
+from io import BytesIO
 
 from spikee.templates.provider import Provider
-from spikee.utilities.hinting import ModuleDescriptionHint, Audio
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import Audio, ModuleDescriptionHint
 from spikee.utilities.llm_message import (
-    single_message,
     AIMessage,
     HumanMessage,
     MessageHint,
+    single_message,
 )
 
 
@@ -30,7 +28,7 @@ class OpenAISTTProvider(Provider):
         return "gpt-4o-mini-transcribe"
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {
             "gpt-4o-mini-transcribe": "gpt-4o-mini-transcribe",
             "gpt-4o-transcribe": "gpt-4o-transcribe",
@@ -45,8 +43,8 @@ class OpenAISTTProvider(Provider):
     def setup(
         self,
         model: str,
-        max_tokens: Union[int, None] = None,
-        temperature: Union[float, None] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **additional_kwargs,
     ) -> None:
         self.model = model
@@ -75,7 +73,7 @@ class OpenAISTTProvider(Provider):
         content = msg.content
 
         if not isinstance(content, Audio):
-            raise ValueError(
+            raise TypeError(
                 "OpenAI STT Provider requires a user message containing audio content."
             )
 
@@ -103,6 +101,7 @@ class OpenAISTTProvider(Provider):
 
 if __name__ == "__main__":
     import sys
+
     from dotenv import load_dotenv
 
     load_dotenv()

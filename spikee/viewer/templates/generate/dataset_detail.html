@@ -10,7 +10,27 @@
         <a href="/generate/datasets" class="btn btn-sm btn-outline-secondary">&larr; All Datasets</a>
         <h5 class="fw-semibold mb-0 ms-1 font-monospace" style="font-size:0.95rem">{{ dataset_name }}</h5>
         <span class="badge bg-secondary rounded-pill">{{ meta.entry_count }} entries</span>
-        <div class="ms-auto">
+        <div class="ms-auto d-flex align-items-center gap-2">
+            <button type="button" id="clone-dataset-btn" class="btn btn-sm btn-outline-primary" title="Clone dataset">
+                <i class="bi bi-files"></i> Clone
+            </button>
+            <button type="button" id="rename-dataset-btn" class="btn btn-sm btn-outline-warning" title="Rename dataset">
+                <i class="bi bi-pencil"></i> Rename
+            </button>
+            <button type="button" id="delete-dataset-btn" class="btn btn-sm btn-outline-danger" title="Delete dataset">
+                <i class="bi bi-trash"></i> Delete
+            </button>
+            <span class="text-muted px-1">|</span>
+            <a href="/generate/datasets/{{ dataset_name }}/edit" class="btn btn-sm btn-secondary" title="Edit dataset file">
+                <i class="bi bi-pencil-square"></i> Raw Edit
+            </a>
+            <a href="/generate/datasets/{{ dataset_name }}/entries/new" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus"></i> New Row
+            </a>
+            <button type="button" id="delete-selected-rows" class="btn btn-sm btn-danger" disabled>
+                <i class="bi bi-trash"></i> Delete Rows
+            </button>
+            <span class="text-muted px-1">|</span>
             <a href="/test/run?dataset={{ dataset_name }}" class="btn btn-sm btn-spikee">
                 Test this dataset &rarr;
             </a>
@@ -45,15 +65,18 @@
             <table class="table table-sm table-hover align-middle text-start mb-0">
                 <thead class="table-light border-bottom">
                     <tr>
+                        <th style="width:34px"><input type="checkbox" id="select-all-rows" aria-label="Select all visible rows"></th>
                         {% for col in columns %}
                         <th class="{% if loop.first %}ps-3 {% endif %}text-muted small fw-semibold"
                             style="{% if col != 'content' %}width:{{ col_widths[col] }}{% endif %}">{{ col_labels[col] }}</th>
                         {% endfor %}
+                        <th style="width:64px"></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for entry in entries %}
                     <tr>
+                        <td><input type="checkbox" class="dataset-row-check" data-line-no="{{ entry.line_no }}" aria-label="Select row"></td>
                         {% for col in columns %}
                         {% if col == 'id' %}
                         <td class="ps-3 text-muted small font-monospace">{{ entry.id }}</td>
@@ -68,20 +91,27 @@
                         {% elif col == 'position' %}
                         <td class="small text-muted">{{ entry.position or '—' }}</td>
                         {% elif col == 'content' %}
-                        <td class="small" style="word-break:break-word;white-space:normal">{{ entry.content or '—' }}</td>
+                        <td class="small" style="max-width:520px">
+                            <div class="text-truncate-2" title="{{ entry.content or '' }}">{{ entry.content or '—' }}</div>
+                        </td>
                         {% endif %}
                         {% endfor %}
+                        <td class="text-end pe-2">
+                            <a class="btn btn-xs btn-outline-primary"
+                               href="/generate/datasets/{{ dataset_name }}/entries/{{ entry.line_no }}/edit"
+                               aria-label="Edit row">Edit</a>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="{{ columns | length }}" class="text-center text-muted py-4 small">
+                        <td colspan="{{ columns | length + 2 }}" class="text-center text-muted py-4 small">
                             No entries found in this dataset.
                         </td>
                     </tr>
                     {% endfor %}
                     {% if total_pages > 1 and page < total_pages %}
                     <tr>
-                        <td colspan="{{ columns | length }}" class="ps-3 text-muted small border-top fst-italic">
+                        <td colspan="{{ columns | length + 2 }}" class="ps-3 text-muted small border-top fst-italic">
                             Showing {{ entries | length }} of {{ total }} entries.
                             <a href="/generate/datasets/{{ dataset_name }}?page={{ page + 1 }}">Next page &rarr;</a>
                         </td>
@@ -93,4 +123,92 @@
     </div>
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    try {
+        var name = '{{ dataset_name }}';
+
+        var selectAll = document.getElementById('select-all-rows');
+        var rowChecks = function () { return Array.from(document.querySelectorAll('.dataset-row-check')); };
+        var deleteSelected = document.getElementById('delete-selected-rows');
+        function refreshSelection() {
+            var selected = rowChecks().filter(function (check) { return check.checked; });
+            if (deleteSelected) deleteSelected.disabled = selected.length === 0;
+            if (selectAll) selectAll.checked = rowChecks().length > 0 && selected.length === rowChecks().length;
+        }
+        if (selectAll) selectAll.addEventListener('change', function () {
+            rowChecks().forEach(function (check) { check.checked = selectAll.checked; });
+            refreshSelection();
+        });
+        rowChecks().forEach(function (check) { check.addEventListener('change', refreshSelection); });
+        if (deleteSelected) deleteSelected.addEventListener('click', function () {
+            var lineNumbers = rowChecks().filter(function (check) { return check.checked; })
+                .map(function (check) { return Number(check.dataset.lineNo); });
+            if (!lineNumbers.length || !confirm('Delete ' + lineNumbers.length + ' selected row(s)?')) return;
+            spikee.fetchJson('/generate/datasets/' + encodeURIComponent(name) + '/lines', {
+                method: 'POST', body: JSON.stringify({ line_numbers: lineNumbers })
+            }).then(function () { window.location.reload(); }).catch(function (err) { alert('Delete failed: ' + err.message); });
+        });
+
+        // Clone
+        var cloneBtn = document.getElementById('clone-dataset-btn');
+        if (cloneBtn) {
+            cloneBtn.addEventListener('click', function () {
+                var suggestion = name.replace(/\.jsonl$/i, '') + '-copy.jsonl';
+                spikee.promptModal('Clone "' + name + '" as:', suggestion).then(function (newName) {
+                    if (newName === null || !String(newName).trim()) return;
+                    return spikee.fetchJson('/generate/datasets/' + encodeURIComponent(name) + '/clone', {
+                        method: 'POST',
+                        body: JSON.stringify({ new_name: newName.trim() })
+                    }).then(function (data) {
+                        if (data && data.url) window.location.href = data.url;
+                    }).catch(function (err) {
+                        alert('Clone failed: ' + err.message);
+                    });
+                });
+            });
+        }
+
+        // Rename
+        var renameBtn = document.getElementById('rename-dataset-btn');
+        if (renameBtn) {
+            renameBtn.addEventListener('click', function () {
+                spikee.promptModal('Rename "' + name + '" to:', name).then(function (newName) {
+                    if (newName === null || !String(newName).trim()) return;
+                    newName = newName.trim();
+                    return spikee.fetchJson('/generate/datasets/' + encodeURIComponent(name) + '/rename', {
+                        method: 'POST',
+                        body: JSON.stringify({ new_name: newName })
+                    }).then(function (data) {
+                        if (data && data.url) window.location.href = data.url;
+                    }).catch(function (err) {
+                        alert('Rename failed: ' + err.message);
+                    });
+                });
+            });
+        }
+
+        // Delete
+        var deleteBtn = document.getElementById('delete-dataset-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function () {
+                if (!confirm('Delete "' + name + '"? This cannot be undone.')) return;
+                return spikee.fetchJson('/generate/datasets/' + encodeURIComponent(name), {
+                    method: 'DELETE'
+                }).then(function () {
+                    window.location.href = '/generate/datasets';
+                }).catch(function (err) {
+                    alert('Delete failed: ' + err.message);
+                });
+            });
+        }
+    } catch (e) {
+        console.error('[dataset_detail] init error', e);
+        alert('dataset detail init error: ' + e.message);
+    }
+})();
+</script>
 {% endblock %}

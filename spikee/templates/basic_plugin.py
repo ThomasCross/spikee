@@ -1,6 +1,5 @@
-from abc import ABC, abstractmethod
 import re
-from typing import List, Union
+from abc import ABC, abstractmethod
 
 from spikee.templates.plugin import Plugin
 
@@ -11,8 +10,11 @@ class BasicPlugin(Plugin, ABC):
         """Transform the input text according to the plugin's functionality."""
 
     def transform(
-        self, content: str, exclude_patterns: List[str] = [], plugin_option: str = ""
-    ) -> Union[str, List[str]]:
+        self,
+        content: str,
+        exclude_patterns: list[str] | None = None,
+        plugin_option: str = "",
+    ) -> str | list[str]:
 
         if exclude_patterns:
             compound = "(" + "|".join(exclude_patterns) + ")"

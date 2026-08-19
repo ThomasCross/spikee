@@ -1,8 +1,8 @@
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+
 from spikee.templates.provider import Provider
 from spikee.utilities.llm_message import MessageHint
-
-from abc import ABC, abstractmethod
-from typing import Callable
 
 
 class StreamingProvider(Provider, ABC):

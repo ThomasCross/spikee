@@ -12,17 +12,18 @@ Requires the Pillow library for image processing. Install with:
 
 import base64
 from io import BytesIO
-from typing import List, Optional
 
 from PIL import Image, ImageDraw, ImageFont
 
 from spikee.templates.plugin import Plugin
+from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import (
+    Image as ImageContent,
+)
 from spikee.utilities.hinting import (
     ModuleDescriptionHint,
     ModuleOptionsHint,
-    Image as ImageContent,
 )
-from spikee.utilities.enums import ModuleTag
 
 
 class MultiModalImage(Plugin):
@@ -38,14 +39,14 @@ class MultiModalImage(Plugin):
     def transform(
         self,
         content: str,
-        exclude_patterns: Optional[List[str]] = None,
-        plugin_option: Optional[str] = None,
+        exclude_patterns: list[str] | None = None,
+        plugin_option: str | None = None,
     ) -> ImageContent:
 
         # Load font
         try:
             font = ImageFont.truetype("arial.ttf", 24)
-        except IOError:
+        except OSError:
             font = ImageFont.load_default()
 
         max_width = 800

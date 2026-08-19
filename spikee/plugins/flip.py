@@ -1,9 +1,8 @@
 import re
-from typing import List, Optional
 
 from spikee.templates.plugin import Plugin
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.modules import parse_options
 
 
@@ -26,7 +25,7 @@ class FlipPlugin(Plugin):
     def transform(
         self,
         content: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
     ) -> str:
         opts = parse_options(plugin_option)

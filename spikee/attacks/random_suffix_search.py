@@ -38,19 +38,20 @@ Returns:
 """
 
 import random
+from collections.abc import Callable
+
 import numpy as np
 import tiktoken
-from typing import Callable
 
-from spikee.tester import AdvancedTargetWrapper
 from spikee.templates.attack import Attack
+from spikee.tester import AdvancedTargetWrapper
+from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import (
+    AttackResponseHint,
     ModuleDescriptionHint,
     ModuleOptionsHint,
-    AttackResponseHint,
     process_target_content,
 )
-from spikee.utilities.enums import ModuleTag
 
 
 class RandomSuffixSearch(Attack):
@@ -153,7 +154,7 @@ class RandomSuffixSearch(Attack):
                 )
 
                 success = call_judge(entry, response)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 success = False
                 response = str(e)
 

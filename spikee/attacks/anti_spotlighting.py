@@ -29,17 +29,17 @@ Returns:
 """
 
 import random
-from typing import Callable, List
+from collections.abc import Callable
 
-from spikee.tester import AdvancedTargetWrapper
 from spikee.templates.attack import Attack
+from spikee.tester import AdvancedTargetWrapper
+from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import (
+    AttackResponseHint,
     ModuleDescriptionHint,
     ModuleOptionsHint,
-    AttackResponseHint,
     process_target_content,
 )
-from spikee.utilities.enums import ModuleTag
 
 
 class AntiSpotlightingAttack(Attack):
@@ -114,7 +114,7 @@ class AntiSpotlightingAttack(Attack):
 
                 last_response = response
                 success = call_judge(entry, response)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 success = False
                 last_response = str(e)
                 print(f"[Anti-Spotlighting] Entry ID {entry.get('id', 'unknown')}: {e}")
@@ -136,7 +136,7 @@ class AntiSpotlightingAttack(Attack):
 
         return min(len(variants), max_iterations), False, last_payload, last_response
 
-    def _generate_variants(self, text: str) -> List[str]:
+    def _generate_variants(self, text: str) -> list[str]:
         """
         Generates variants of the input text by wrapping it in various delimiter formats.
 

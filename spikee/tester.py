@@ -1,53 +1,53 @@
-import os
-import re
-import time
-import random
 import asyncio
-import threading
 import inspect
-import traceback
-import sys
 import multiprocessing
-from pathlib import Path
+import os
+import random
+import re
+import sys
+import threading
+import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from tqdm import tqdm
-from datetime import datetime
-from InquirerPy import inquirer
-from typing import Any, Union, Optional
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
-from spikee.templates.target import Target
-from spikee.templates.attack import Attack
+from InquirerPy import inquirer
+from tqdm import tqdm
 
 from spikee.judge import annotate_judge_options, call_judge
+from spikee.templates.attack import Attack
+from spikee.templates.target import Target
 from spikee.utilities.enums import Turn
 from spikee.utilities.files import (
+    append_jsonl_entry,
+    build_resource_name,
+    does_resource_name_match,
+    extract_resource_name,
+    prepare_output_file,
+    process_jsonl_input_files,
     read_jsonl_file,
     write_jsonl_file,
-    append_jsonl_entry,
-    process_jsonl_input_files,
-    extract_resource_name,
-    build_resource_name,
-    prepare_output_file,
-    does_resource_name_match,
 )
-from spikee.utilities.modules import load_module_from_path, get_default_option
 from spikee.utilities.hinting import (
-    TargetResponseHint,
     Content,
+    TargetResponseHint,
     content_factory,
     get_content,
     get_content_type,
     validate_content_signature,
 )
+from spikee.utilities.modules import get_default_option, load_module_from_path
 from spikee.utilities.tags import validate_and_get_tag
 
 
 class GuardrailTrigger(Exception):
     """Exception raised when a guardrail is triggered."""
 
-    def __init__(self, message, categories={}):
+    def __init__(self, message, categories: dict | None = None):
         super().__init__(message)
-        self.categories = categories
+        self.categories = {} if categories is None else categories
 
 
 class RetryableError(Exception):
@@ -60,8 +60,6 @@ class RetryableError(Exception):
 
 class MultiTurnSkip(Exception):
     """Exception raised to skip multi-turn entries being processed as single-turn."""
-
-    pass
 
 
 class AdvancedTargetWrapper:
@@ -138,14 +136,14 @@ class AdvancedTargetWrapper:
     def process_input(
         self,
         input_text: Content,
-        system_message: Optional[Content] = None,
+        system_message: Content | None = None,
         logprobs=False,
         input_id=None,
         output_file=None,
         spikee_session_id=None,
         backtrack=False,
     ) -> TargetResponseHint:
-        last_error: Union[Exception, None] = None
+        last_error: Exception | None = None
         retries = 0
 
         while retries < self.max_retries:
@@ -169,7 +167,7 @@ class AdvancedTargetWrapper:
                 if not validate_content_signature(
                     input_text, self.target_module.process_input, "input_text"
                 ):
-                    raise ValueError(
+                    raise TypeError(
                         "Input content does not match the expected type for the target's process_input function."
                     )
 
@@ -190,7 +188,7 @@ class AdvancedTargetWrapper:
                     )
 
                 # Unpack (response, meta) if tuple returned
-                result: Union[Content, bool]
+                result: Content | bool
                 meta: Any = None
                 if isinstance(response, tuple):
                     if len(response) == 2:
@@ -205,7 +203,7 @@ class AdvancedTargetWrapper:
                     result = response
 
                 else:
-                    raise ValueError(
+                    raise TypeError(
                         "Invalid response type from target's process_input. Expected Content, bool.",
                         str(type(response)),
                     )
@@ -236,7 +234,7 @@ class AdvancedTargetWrapper:
                 last_error = e
                 break
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 last_error = e
                 if "429" in str(e) and retries < self.max_retries - 1:
                     wait_time = random.randint(30, 120)
@@ -273,7 +271,7 @@ def _build_target_name(target, target_options):
         try:
             mod = load_module_from_path(target, "targets")
             target_options = get_default_option(mod)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     if target_options is None:
@@ -424,8 +422,8 @@ def _select_resume_file_interactive(
 
 def _format_candidate_line(p: Path) -> str:
     ts = _parse_timestamp_from_filename(p)
-    dt = datetime.fromtimestamp(ts)
-    age_sec = max(0, int((datetime.now() - dt).total_seconds()))
+    dt = datetime.fromtimestamp(ts, UTC)
+    age_sec = max(0, int((datetime.now(UTC) - dt).total_seconds()))
     # compact age display
     if age_sec < 90:
         age = f"{age_sec}s"
@@ -444,7 +442,7 @@ def _parse_timestamp_from_filename(p: Path) -> int:
     try:
         ts_str = name.rsplit("_", 1)[-1].removesuffix(".jsonl")
         return int(ts_str)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return int(p.stat().st_mtime)
 
 
@@ -529,10 +527,10 @@ def _do_single_request(
         response_time = None
         success = False
 
-    except ImportError as ie:
-        raise ie
+    except ImportError:
+        raise
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         error_message = str(e)
         response_str = ""
         response_time = None
@@ -595,7 +593,7 @@ def process_entry(
     target_module,
     attempts=1,
     attack_name="",
-    attack_module: Optional[Attack] = None,
+    attack_module: Attack | None = None,
     attack_iterations=0,
     attack_options=None,
     attack_only=False,
@@ -791,7 +789,7 @@ def process_entry(
                 )
 
             results_list.append(attack_result)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # Save original attack_input for extracting conversation/objective if it's a dict
             if "original_attack_input" in locals() and original_attack_input:
                 attack_input = original_attack_input
@@ -961,9 +959,9 @@ def _run_threaded(
                 print(
                     "Exiting early due to ImportError in attack module. Please import required dependencies and re-run."
                 )
-                exit(1)
+                sys.exit(1)
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"[Error] Entry ID {entry['id']}: {e}")
                 traceback.print_exc()
     except KeyboardInterrupt:
@@ -1000,7 +998,7 @@ def test_dataset(args):
         )
     except ImportError as e:
         print(e)
-        exit(1)
+        sys.exit(1)
 
     # Validate multi-turn capability
     if (
@@ -1018,7 +1016,7 @@ def test_dataset(args):
             print(
                 f"[Error] The selected attack '{attack_name}' requires multi-turn support, but the target '{args.target}' does not support multi-turn testing."
             )
-            exit(1)
+            sys.exit(1)
 
     else:
         # Validate target supports single-turn
@@ -1026,7 +1024,7 @@ def test_dataset(args):
             print(
                 f"[Error] The selected target '{args.target}' does not support single-turn testing."
             )
-            exit(1)
+            sys.exit(1)
 
         print(
             f"[Info] Performing a single-turn attack using '{attack_name}' on target '{args.target}'."
@@ -1047,7 +1045,7 @@ def test_dataset(args):
         print(
             f"[Error] --resume-file cannot be used when testing multiple datasets. Currently selected {len(datasets)} datasets."
         )
-        exit(1)
+        sys.exit(1)
 
     # Print overview of datasets
     print("[Overview] Testing the following dataset(s): ")

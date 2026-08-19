@@ -23,8 +23,6 @@ Returns:
     str: The transformed text.
 """
 
-from typing import List, Optional
-
 from spikee.templates.basic_plugin import BasicPlugin
 from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
@@ -64,7 +62,7 @@ class AtbashPlugin(BasicPlugin):
     def transform(
         self,
         text: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
     ) -> str:
         """

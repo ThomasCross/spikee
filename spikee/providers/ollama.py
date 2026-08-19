@@ -1,12 +1,13 @@
-from any_llm import AnyLLM
-from typing import Union, Any, Dict
 import os
+from typing import Any
+
 import requests
+from any_llm import AnyLLM
 
 from spikee.templates.provider import Provider
-from spikee.utilities.hinting import ModuleDescriptionHint
 from spikee.utilities.enums import ModuleTag
-from spikee.utilities.llm_message import format_messages, AIMessage, MessageHint
+from spikee.utilities.hinting import ModuleDescriptionHint
+from spikee.utilities.llm_message import AIMessage, MessageHint, format_messages
 
 
 class AnyLLMOllamaProvider(Provider):
@@ -14,18 +15,18 @@ class AnyLLMOllamaProvider(Provider):
 
     BASE_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 
-    stored_models: Union[Dict[str, str], None] = None
+    stored_models: dict[str, str] | None = None
 
     @property
     def default_model(self) -> str:
         if self.stored_models is not None and len(self.stored_models) > 0:
-            return list(self.stored_models.keys())[0]
+            return next(iter(self.stored_models.keys()))
 
         else:
             return "none"
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         if self.stored_models is None:
             models = self.get_ollama_models()
             if "error" in models:
@@ -35,21 +36,21 @@ class AnyLLMOllamaProvider(Provider):
 
         return self.stored_models
 
-    def get_ollama_models(self) -> Dict[str, str]:
+    def get_ollama_models(self) -> dict[str, str]:
         """Programmatically gather the list of local models see: ollama list"""
         try:
             response = requests.get(f"{self.BASE_URL}/api/tags")
             data = response.json()
             return {model["model"]: model["model"] for model in data["models"]}
 
-        except Exception:
+        except (KeyError, TypeError, ValueError, requests.RequestException):
             return {"error": "Unable to fetch models from Ollama API."}
 
     def setup(
         self,
         model: str,
-        max_tokens: Union[int, None] = None,
-        temperature: Union[float, None] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **kwargs,
     ):
         self.model = model
@@ -68,7 +69,7 @@ class AnyLLMOllamaProvider(Provider):
                 "[Import Error] Provider Module 'ollama' is missing required packages for Ollama. Please run `pip install spikee[ollama]` to install them."
             )
 
-        options_kwargs: Dict[str, Any] = {}
+        options_kwargs: dict[str, Any] = {}
         if self.max_tokens is not None:
             options_kwargs["max_tokens"] = self.max_tokens
 

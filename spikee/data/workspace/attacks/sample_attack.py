@@ -48,11 +48,11 @@ Notes:
 """
 
 import random
-from typing import Callable
+from collections.abc import Callable
 
-from spikee.tester import AdvancedTargetWrapper
 from spikee.templates.attack import Attack
-from spikee.utilities.hinting import ModuleOptionsHint, AttackResponseHint
+from spikee.tester import AdvancedTargetWrapper
+from spikee.utilities.hinting import AttackResponseHint, ModuleOptionsHint
 
 
 class SampleAttack(Attack):
@@ -141,7 +141,7 @@ class SampleAttack(Attack):
                             attempts_bar.total = attempts_bar.total - remaining
                             attempts_bar.refresh()
                     return i, True, candidate_text, response
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 last_response = str(e)
             if attempts_bar:
                 with bar_lock:

@@ -7,16 +7,13 @@ Usage:
   spikee test --plugins rag_poisoner --plugin-options "rag_poisoner:model=openai/gpt-4o,variants=5"
 """
 
-from typing import List, Dict, Union, Optional
-
+from spikee.attacks.rag_poisoner import SPIKEE_RAG_POISONER_PROMPT
 from spikee.templates.plugin import Plugin
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.llm import get_llm
 from spikee.utilities.llm_message import HumanMessage
-from spikee.utilities.modules import parse_options, extract_json_or_fail
-
-from spikee.attacks.rag_poisoner import SPIKEE_RAG_POISONER_PROMPT
+from spikee.utilities.modules import extract_json_or_fail, parse_options
 
 
 class RAGPoisoner(Plugin):
@@ -39,7 +36,7 @@ class RAGPoisoner(Plugin):
         return int(opts.get("variants", self.VARIANTS))
 
     def _generate_rag_attack(
-        self, llm, objective: str, previous_attempts: List[Dict]
+        self, llm, objective: str, previous_attempts: list[dict]
     ) -> str:
         """Generate a RAG poisoning attack using the LLM."""
         # Format previous attempts properly
@@ -65,7 +62,7 @@ class RAGPoisoner(Plugin):
         res_text = llm.invoke([prompt]).content
 
         if not isinstance(res_text, str):
-            raise RuntimeError("LLM response is not a string as expected.")
+            raise TypeError("LLM response is not a string as expected.")
 
         obj = extract_json_or_fail(res_text)
         attack_prompt = obj.get("attack_prompt", "")
@@ -76,9 +73,9 @@ class RAGPoisoner(Plugin):
     def transform(
         self,
         content: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
-    ) -> Union[str, List[str]]:
+    ) -> str | list[str]:
         opts = parse_options(plugin_option)
         llm_model = opts.get("model", self.DEFAULT_MODEL)
         variants = int(opts.get("variants", self.VARIANTS))
@@ -93,7 +90,7 @@ class RAGPoisoner(Plugin):
                 attack_prompts.append(
                     self._generate_rag_attack(llm, content, previous_attempts)
                 )
-            except Exception as e:
-                print(f"[RAGPoisoner] Error generating prompt {i}: {str(e)}")
+            except Exception as e:  # noqa: BLE001
+                print(f"[RAGPoisoner] Error generating prompt {i}: {e!s}")
 
         return attack_prompts

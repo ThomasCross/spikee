@@ -89,22 +89,6 @@ def _parse_non_negative_float(
     return v
 
 
-def _parse_non_negative_float(
-    value: str, field_name: str, default: float = 0.0
-) -> float:
-    """Parse *value* as a non-negative float.  Returns *default* if empty."""
-    stripped = value.strip() if value else ""
-    if not stripped:
-        return default
-    try:
-        v = float(stripped)
-    except ValueError:
-        raise FormValidationError(f"{field_name} must be a valid number.")
-    if v < 0:
-        raise FormValidationError(f"{field_name} must be non-negative.")
-    return v
-
-
 # ── Generate form ─────────────────────────────────────────────────────────────
 
 
