@@ -23,8 +23,8 @@ from dotenv import load_dotenv
 
 from spikee.templates.llm_judge import LLMJudge
 from spikee.utilities.enums import ModuleTag
-from spikee.utilities.llm_message import HumanMessage, SystemMessage
 from spikee.utilities.hinting import ModuleDescriptionHint
+from spikee.utilities.llm_message import HumanMessage, SystemMessage
 
 
 class LLMJudgeOutputCriteria(LLMJudge):
@@ -77,7 +77,7 @@ class LLMJudgeOutputCriteria(LLMJudge):
             response = llm.invoke(messages).content
 
             if not isinstance(response, str):
-                raise ValueError(
+                raise TypeError(
                     f"[LLMJudgeOutputCriteria] LLM response is not a string as expected, got {type(response)}."
                 )
 

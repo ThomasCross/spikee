@@ -17,7 +17,6 @@ Return values:
         * False indicates the guardrail blocked the attack.
 """
 
-from typing import Optional
 from dotenv import load_dotenv
 
 from spikee.utilities.hinting import ModuleOptionsHint, TargetResponseHint
@@ -33,9 +32,9 @@ def get_available_option_values(self) -> ModuleOptionsHint:
 
 def process_input(
     input_text: str,
-    input_id: Optional[str] = None,
-    system_message: Optional[str] = None,
-    target_options: Optional[str] = None,
+    input_id: str | None = None,
+    system_message: str | None = None,
+    target_options: str | None = None,
     logprobs=False,
 ) -> TargetResponseHint:
     """
@@ -78,5 +77,5 @@ if __name__ == "__main__":
     try:
         response = process_input("Hello!")
         print(response)
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001
         print("Error:", err)

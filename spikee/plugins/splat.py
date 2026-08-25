@@ -20,8 +20,8 @@ Returns:
 import random
 
 from spikee.templates.basic_plugin import BasicPlugin
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.modules import parse_options
 
 

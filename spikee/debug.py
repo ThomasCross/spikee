@@ -17,10 +17,10 @@ CLI Usage:
 import base64
 import json
 
-from spikee.utilities.modules import load_module_from_path
-from spikee.utilities.hinting import get_content
 from spikee.judge import call_judge
+from spikee.utilities.hinting import get_content
 from spikee.utilities.llm import get_llm
+from spikee.utilities.modules import load_module_from_path
 
 
 def debug_module_target(args):

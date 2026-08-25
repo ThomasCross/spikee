@@ -38,15 +38,21 @@ jobs:
 
       - name: Auto-format, sort imports, and fix lint
         shell: bash
+        env:
+          CAN_PUSH_FIXES: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         run: |
-          ruff format .
-          ruff check --fix .
+          ruff format ./spikee/
+          ruff check --fix ./spikee/
           if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "style: auto-format & lint via ruff"
-            git push
+            if [[ "$CAN_PUSH_FIXES" == "true" ]]; then
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git add -A
+              git commit -m "style: auto-format & lint via ruff"
+              git push
+            else
+              echo "Ruff applied local fixes; fork PRs are not pushed by CI."
+            fi
           fi
 
   functional-tests:
@@ -58,14 +64,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-<<<<<<< Updated upstream
-          # On PRs, check out the head ref so we get any lint-fix commits
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || '' }}
-=======
           # On PRs, check out the head repository and ref so fork branches are available.
           repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || '' }}
->>>>>>> Stashed changes
 
       - name: Set up Python
         uses: actions/setup-python@v5

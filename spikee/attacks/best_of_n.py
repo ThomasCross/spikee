@@ -24,19 +24,19 @@ Returns:
     A tuple: (iterations_attempted, success_flag, last_payload, last_response)
 """
 
-import re
 import random
-from typing import Callable
+import re
+from collections.abc import Callable
 
-from spikee.tester import AdvancedTargetWrapper
 from spikee.templates.attack import Attack
+from spikee.tester import AdvancedTargetWrapper
+from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import (
+    AttackResponseHint,
     ModuleDescriptionHint,
     ModuleOptionsHint,
-    AttackResponseHint,
     process_target_content,
 )
-from spikee.utilities.enums import ModuleTag
 
 
 class BestOfNAttack(Attack):
@@ -92,7 +92,7 @@ class BestOfNAttack(Attack):
                 )
                 last_response = response
                 success = call_judge(entry, response)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 success = False
                 last_response = str(e)
                 print(f"[Best-Of-N] Entry ID {entry['id']}: {e}")
