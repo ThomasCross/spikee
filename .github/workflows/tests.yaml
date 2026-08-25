@@ -24,7 +24,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref || '' }}
+          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || '' }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -63,8 +64,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # On PRs, check out the head ref so we get any lint-fix commits
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref || '' }}
+          # On PRs, check out the head repository and ref so fork branches are available.
+          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || '' }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
