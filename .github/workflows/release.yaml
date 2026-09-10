@@ -1,4 +1,4 @@
-name: Manual Release (auto-bump)
+name: Prepare Release
 
 on:
   workflow_dispatch:
@@ -14,16 +14,11 @@ on:
         type: boolean
 
 permissions:
-  contents: write  # push commit + tag, bump develop
+  contents: write
+  pull-requests: write
 
 jobs:
-  tests:
-    if: github.event.inputs.skip_tests != 'true'
-    uses: ./.github/workflows/tests.yaml
-
-  release:
-    needs: tests
-    if: always() && (github.event.inputs.skip_tests == 'true' || needs.tests.result == 'success')
+  prepare-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +50,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.11"
+
+      - name: Validate merged release contents
+        if: github.event.inputs.skip_tests != 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff pytest
+          ruff format --check ./spikee/
+          ruff check ./spikee/
+          pip install .[all]
+          pytest tests/functional
 
       - name: Install tools
         run: pip install toml
@@ -224,75 +229,26 @@ jobs:
           } > "$new_file"
           mv "$new_file" CHANGELOG.md
 
-      - name: Commit and tag
-        id: tag
+      - name: Create release pull request
         shell: bash
         run: |
           VERSION="${{ steps.bump.outputs.new_version }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pyproject.toml spikee/__init__.py README.md CHANGELOG.md || true
-          git commit -m "Release ${VERSION}" || echo "No changes to commit."
-          git tag "v${VERSION}"
-          git push origin main --tags
+          RELEASE_BRANCH="release/v${VERSION}"
 
-      - name: Install build tools
-        run: pip install --upgrade build twine
-
-      - name: Build
-        run: python -m build
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
-
-      - name: Bump develop to next dev version
-        if: always() && steps.tag.outcome == 'success'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          NEXT_DEV="${{ steps.bump.outputs.next_dev_version }}"
-          VERSION="${{ steps.bump.outputs.new_version }}"
-          export NEXT_DEV
-
-          # Fetch and checkout develop, then merge the release commit from main
-          git fetch origin develop
-          git checkout develop
-          git pull origin develop
-          git merge --ff-only origin/main || git merge -m "chore: merge release ${VERSION} into develop" origin/main
-
-          python - <<EOF
-          import toml, pathlib, re, os
-          next_dev = os.environ["NEXT_DEV"]
-          root = pathlib.Path(".")
-
-          # pyproject.toml
-          pp = root / "pyproject.toml"
-          data = toml.load(pp.open())
-          data["project"]["version"] = next_dev
-          pp.write_text(toml.dumps(data))
-
-          # __init__.py
-          initp = root / "spikee" / "__init__.py"
-          initp.write_text(f'__version__ = "{next_dev}"\n')
-
-          # README.md
-          readme = root / "README.md"
-          if readme.exists():
-              txt = readme.read_text()
-              new_txt, n = re.subn(r"(_Version:\s*)(\d+\.\d+\.\d+(?:-dev)?)(\s*_)",
-                                   rf"\g<1>{next_dev}\3", txt, count=1)
-              if n:
-                  readme.write_text(new_txt)
-                  print("Updated README.md to next dev version.")
-              else:
-                  print("NOTE: README.md version pattern not found; left unchanged.")
-          EOF
+          if git ls-remote --exit-code --heads origin "${RELEASE_BRANCH}"; then
+            echo "ERROR: Branch ${RELEASE_BRANCH} already exists."
+            exit 1
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pyproject.toml spikee/__init__.py README.md
-          git commit -m "chore: bump version to ${NEXT_DEV}"
-          git push origin develop
+          git switch -c "${RELEASE_BRANCH}"
+          git add pyproject.toml spikee/__init__.py README.md CHANGELOG.md
+          git commit -m "Release ${VERSION}"
+          git push origin "${RELEASE_BRANCH}"
+
+          gh pr create \
+            --base main \
+            --head "${RELEASE_BRANCH}" \
+            --title "Release ${VERSION}" \
+            --body "Prepares release ${VERSION} from develop. Merging this pull request will trigger package publication and the next development-version bump."
