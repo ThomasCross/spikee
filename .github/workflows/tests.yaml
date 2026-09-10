@@ -7,19 +7,13 @@ on:
     branches:
       - main
       - develop
-  push:
-    branches:
-      - main
-      - develop
 
 permissions:
-  contents: write  # needed for lint job to push auto-fix commits back to the PR branch
+  contents: read
 
 jobs:
   lint:
     runs-on: ubuntu-latest
-    # Skipped on workflow_call (release) — lint is not part of the release process
-    if: github.event_name != 'workflow_call'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,24 +30,10 @@ jobs:
       - name: Install ruff
         run: pip install ruff
 
-      - name: Auto-format, sort imports, and fix lint
-        shell: bash
-        env:
-          CAN_PUSH_FIXES: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      - name: Check formatting, imports, and lint
         run: |
-          ruff format ./spikee/
-          ruff check --fix ./spikee/
-          if ! git diff --quiet; then
-            if [[ "$CAN_PUSH_FIXES" == "true" ]]; then
-              git config user.name "github-actions[bot]"
-              git config user.email "github-actions[bot]@users.noreply.github.com"
-              git add -A
-              git commit -m "style: auto-format & lint via ruff"
-              git push
-            else
-              echo "Ruff applied local fixes; fork PRs are not pushed by CI."
-            fi
-          fi
+          ruff format --check ./spikee/
+          ruff check ./spikee/
 
   functional-tests:
     runs-on: ubuntu-latest

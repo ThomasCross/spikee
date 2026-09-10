@@ -1,0 +1,115 @@
+name: Publish Reviewed Release
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install tools
+        run: pip install toml
+
+      - name: Read release version
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")"
+          case "${VERSION}" in
+            *-dev) echo "ERROR: main must contain a release version, not ${VERSION}"; exit 1 ;;
+          esac
+          echo "value=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure release tag does not exist
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "ERROR: Tag v${VERSION} already exists."
+            exit 1
+          fi
+
+      - name: Install build tools
+        run: pip install --upgrade build twine
+
+      - name: Build
+        run: python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Create and push release tag
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
+
+      - name: Bump develop to next development version
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          NEXT_DEV="$(python -c "import re, sys; match = re.fullmatch(r'(\\d+)\\.(\\d+)\\.(\\d+)', sys.argv[1]); print(f'{match.group(1)}.{match.group(2)}.{int(match.group(3)) + 1}-dev') if match else sys.exit('Invalid release version')" "${VERSION}")"
+
+          git fetch origin develop
+          git checkout develop
+          git pull origin develop
+          git merge --ff-only origin/main || git merge -m "chore: merge release ${VERSION} into develop" origin/main
+
+          NEXT_DEV="${NEXT_DEV}" python - <<'PY'
+          import os
+          import pathlib
+          import re
+          import toml
+
+          next_dev = os.environ["NEXT_DEV"]
+          root = pathlib.Path(".")
+          pyproject = root / "pyproject.toml"
+          data = toml.load(pyproject.open())
+          data["project"]["version"] = next_dev
+          pyproject.write_text(toml.dumps(data))
+
+          init_file = root / "spikee" / "__init__.py"
+          init_file.write_text(f'__version__ = "{next_dev}"\n')
+
+          readme = root / "README.md"
+          if readme.exists():
+              text = readme.read_text()
+              updated, count = re.subn(
+                  r"(_Version:\s*)(\d+\.\d+\.\d+(?:-dev)?)(\s*_)",
+                  rf"\g<1>{next_dev}\3",
+                  text,
+                  count=1,
+              )
+              if count:
+                  readme.write_text(updated)
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml spikee/__init__.py README.md
+          git commit -m "chore: bump version to ${NEXT_DEV}"
+          git push origin develop
