@@ -56,11 +56,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Validate merged release contents
-        if: github.event.inputs.skip_tests != 'true'
+      - name: Validate merged release contents # Ruff pinned 10/09/2026
+        if: github.event.inputs.skip_tests != 'true' 
         run: |
           python -m pip install --upgrade pip
-          pip install ruff pytest
+          pip install ruff==0.16.6 pytest 
           ruff format --check ./spikee/
           ruff check ./spikee/
           pip install .[all]
@@ -234,6 +234,7 @@ jobs:
           mv "$new_file" CHANGELOG.md
 
       - name: Create release pull request
+        id: create-release-branch
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -252,9 +253,15 @@ jobs:
           git add pyproject.toml spikee/__init__.py README.md CHANGELOG.md
           git commit -m "Release ${VERSION}"
           git push origin "${RELEASE_BRANCH}"
+          echo "release_branch=${RELEASE_BRANCH}" >> "$GITHUB_OUTPUT"
 
           gh pr create \
             --base main \
             --head "${RELEASE_BRANCH}" \
             --title "Release ${VERSION}" \
             --body "Prepares release ${VERSION} from develop. Merging this pull request will trigger package publication and the next development-version bump."
+
+      - name: Delete release branch after failure
+        if: failure() && steps.create-release-branch.outputs.release_branch != ''
+        shell: bash
+        run: git push origin --delete "${{ steps.create-release-branch.outputs.release_branch }}"

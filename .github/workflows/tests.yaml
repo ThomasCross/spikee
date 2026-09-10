@@ -26,8 +26,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install ruff
-        run: pip install ruff
+      - name: Install ruff # Ruff pinned 10/09/2026
+        run: pip install ruff==0.16.6 
 
       - name: Check formatting, imports, and lint
         run: |
