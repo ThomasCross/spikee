@@ -11,6 +11,11 @@ Usage:
          spikee test --dataset datasets/example.jsonl --target sample_pdf_request_target
 """
 
+import json
+
+import requests
+from dotenv import load_dotenv
+
 from spikee.templates.target import Target
 from spikee.tester import GuardrailTrigger
 from spikee.utilities.hinting import (
@@ -18,11 +23,6 @@ from spikee.utilities.hinting import (
     ModuleOptionsHint,
     TargetResponseHint,
 )
-
-from dotenv import load_dotenv
-import json
-import requests
-from typing import Optional
 
 try:
     from fpdf import FPDF
@@ -43,8 +43,8 @@ class SamplePDFRequestTarget(Target):
     def process_input(
         self,
         input_text: str,
-        system_message: Optional[str] = None,
-        target_options: Optional[str] = None,
+        system_message: str | None = None,
+        target_options: str | None = None,
     ) -> TargetResponseHint:
 
         url = "https://reversec.com/api/upload_pdf"
@@ -91,5 +91,5 @@ if __name__ == "__main__":
     try:
         target = SamplePDFRequestTarget()
         print(target.process_input("Hello!"))
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001
         print("Error:", err)

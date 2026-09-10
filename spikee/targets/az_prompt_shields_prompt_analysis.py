@@ -1,12 +1,11 @@
-from typing import Optional
 import os
+
 import requests
 from dotenv import load_dotenv
 
-
 from spikee.templates.target import Target
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 
 
 class AzurePromptShieldsPromptAnalysisTarget(Target):
@@ -34,8 +33,8 @@ class AzurePromptShieldsPromptAnalysisTarget(Target):
     def process_input(
         self,
         input_text: str,
-        system_message: Optional[str] = None,
-        target_options: Optional[str] = None,
+        system_message: str | None = None,
+        target_options: str | None = None,
     ) -> bool:
         """
         Processes input text through Azure Prompt Shields Prompt Analysis API and returns True if the request
@@ -76,9 +75,14 @@ class AzurePromptShieldsPromptAnalysisTarget(Target):
                 error_message = f"Error {response.status_code}: {response.text}"
                 raise RuntimeError(error_message)
 
-        except Exception as e:
+        except (
+            requests.exceptions.RequestException,
+            KeyError,
+            TypeError,
+            ValueError,
+        ) as e:
             raise RuntimeError(
-                f"Unexpected error calling Azure Prompt Shields API: {str(e)}"
+                f"Unexpected error calling Azure Prompt Shields API: {e!s}"
             )
 
 
@@ -92,5 +96,5 @@ if __name__ == "__main__":
 
         print(f"Input: '{sample_text}'")
         print(f"Is unharmful: {result}")
-    except Exception as e:
-        print(f"Error: {str(e)}")
+    except Exception as e:  # noqa: BLE001
+        print(f"Error: {e!s}")

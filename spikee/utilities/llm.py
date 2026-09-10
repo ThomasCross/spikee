@@ -1,11 +1,8 @@
-from typing import List, Union
-
-from spikee.utilities.modules import load_module_from_path
 from spikee.templates.provider import Provider
-from spikee.utilities.modules import collect_modules
+from spikee.utilities.modules import collect_modules, load_module_from_path
 
 
-def get_supported_providers() -> List[str]:
+def get_supported_providers() -> list[str]:
     """Return a list of supported LLM providers."""
     modules, _, _ = collect_modules("providers")
     return modules
@@ -23,10 +20,10 @@ def validate_llm_provider(option: str) -> bool:
 
 def get_llm(
     options: str = "",
-    max_tokens: Union[int, None] = 8,
+    max_tokens: int | None = 8,
     temperature: float = 0,
     **additional_kwargs,
-) -> Union[Provider, None]:
+) -> Provider | None:
     """
     Returns an Provider.
 
@@ -42,8 +39,7 @@ def get_llm(
         )
 
     # Strip "model=" prefix if present
-    if options.startswith("model="):
-        options = options[len("model=") :]
+    options = options.removeprefix("model=")
 
     if options.startswith("offline"):  # Offline mode, no LLM provider
         return None

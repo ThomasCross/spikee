@@ -1,0 +1,82 @@
+{% extends "generate/base.html" %}
+{% block title %}{% if mode == 'entry' %}{% if is_new %}New entry{% else %}Edit entry{% endif %}{% else %}Raw edit{% endif %} — {{ filename }} | SPIKEE{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <a href="{{ back_url }}" class="btn btn-sm btn-outline-secondary">&larr; Back</a>
+        <h5 class="fw-semibold mb-0 ms-1">{% if mode == 'entry' %}{% if is_new %}New entry{% else %}Edit entry{% endif %}{% else %}Raw Edit{% endif %}</h5>
+        <code class="small">{{ filename }}</code>
+        {% if mode == 'entry' %}
+        <span class="badge bg-primary">JSON object</span>
+        <span class="text-muted small">{% if is_new %}Append to end{% else %}Entry {{ line_no + 1 }} of {{ total_entries }}{% endif %}</span>
+        {% else %}
+        <span class="badge bg-warning text-dark">Unchecked save</span>
+        {% endif %}
+        <span class="text-muted small ms-1">{{ size_kb }} KB</span>
+    </div>
+
+    {% if mode == 'raw' %}
+    <div class="alert alert-warning py-2 small mb-3">Raw Edit saves exactly what you enter without JSONL or TOML validation.</div>
+    {% endif %}
+    {% if request.args.get('saved') %}
+    <div class="alert alert-success py-2 small mb-3">File saved successfully.</div>
+    {% endif %}
+    {% if error %}
+    <div class="alert alert-danger py-2 small mb-3"><strong>Entry was not saved:</strong> {{ error }}</div>
+    {% endif %}
+
+    <form method="post" id="edit-form">
+        <input type="hidden" name="action" value="{% if mode == 'entry' %}save_entry{% else %}save_raw{% endif %}">
+        <div class="card spikee-card mb-3">
+            <div class="card-body p-0">
+                <textarea class="form-control font-monospace border-0 rounded"
+                          name="content" id="edit-content" rows="32" spellcheck="false"
+                          autocomplete="off" wrap="soft"
+                          data-editor-mode="{{ mode }}"
+                          style="resize:vertical;white-space:pre-wrap;overflow-wrap:anywhere;border-radius:inherit">{{ content | e }}</textarea>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-spikee px-4">{% if mode == 'entry' %}{% if is_new %}Create Row{% else %}Save Entry{% endif %}{% else %}Save File{% endif %}</button>
+            <a href="{{ back_url }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        document.getElementById('edit-form').submit();
+    }
+});
+(function () {
+    var textarea = document.getElementById('edit-content');
+    var isEntry = textarea.dataset.editorMode === 'entry';
+    function resizeEditor() {
+        textarea.style.height = 'auto';
+        var top = textarea.getBoundingClientRect().top;
+        var available = Math.max(180, window.innerHeight - top - 150);
+        var minimum = isEntry ? 120 : 320;
+        var target = Math.max(minimum, textarea.scrollHeight);
+        textarea.style.height = Math.min(target, available) + 'px';
+        textarea.style.overflowY = target > available ? 'auto' : 'hidden';
+    }
+    textarea.addEventListener('input', resizeEditor);
+    window.addEventListener('resize', resizeEditor);
+    resizeEditor();
+})();
+(function () {
+    var textarea = document.getElementById('edit-content');
+    var original = textarea.value;
+    var saved = false;
+    document.getElementById('edit-form').addEventListener('submit', function () { saved = true; });
+    window.addEventListener('beforeunload', function (e) {
+        if (!saved && textarea.value !== original) { e.preventDefault(); e.returnValue = ''; }
+    });
+})();
+</script>
+{% endblock %}

@@ -1,4 +1,5 @@
 import re
+import sys
 
 
 def validate_tag(tag):
@@ -42,5 +43,5 @@ def validate_and_get_tag(tag):
     valid, err = validate_tag(tag)
     if not valid:
         print(f"Error: Invalid tag: {err}")
-        exit(1)
+        sys.exit(1)
     return tag

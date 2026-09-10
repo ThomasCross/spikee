@@ -1,20 +1,19 @@
-import os
+import asyncio
 import inspect
 import json
-import time
-import asyncio
+import os
+import sys
 import threading
+import time
 from collections import defaultdict
-from typing import Union, List
-from tabulate import tabulate
-from pathlib import Path
-from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
-from spikee.utilities.files import read_jsonl_file, read_toml_file, write_jsonl_file
-from spikee.utilities.modules import load_module_from_path
-from spikee.utilities.tags import validate_tag
+from tabulate import tabulate
+from tqdm import tqdm
+
 from spikee.utilities.enums import EntryType
+from spikee.utilities.files import read_jsonl_file, read_toml_file, write_jsonl_file
 from spikee.utilities.hinting import (
     Content,
     content_factory,
@@ -22,6 +21,8 @@ from spikee.utilities.hinting import (
     get_content_type,
     validate_content_annotation,
 )
+from spikee.utilities.modules import load_module_from_path
+from spikee.utilities.tags import validate_tag
 
 
 class Entry:
@@ -29,7 +30,7 @@ class Entry:
 
     def __init__(
         self,
-        entry_type: Union[EntryType, str],
+        entry_type: EntryType | str,
         entry_id,
         base_id,
         jailbreak_id,
@@ -312,7 +313,7 @@ def find_nearest_whitespace(text, index) -> int:
 
 def get_system_message(
     system_message_config, spotlighting_data_marker=None
-) -> Union[str, None]:
+) -> str | None:
     """
     Retrieves the appropriate system message from the system_message_config
     based on a given spotlighting data marker. Falls back to 'default' if no
@@ -354,7 +355,7 @@ def load_plugins(plugin_names):
                 plugins.append((name, load_module_from_path(name, "plugins")))
             except ImportError as e:
                 print(e)
-                exit(1)
+                sys.exit(1)
 
         elif (
             name is not None
@@ -367,14 +368,14 @@ def load_plugins(plugin_names):
                     )
                 except ImportError as e:
                     print(e)
-                    exit(1)
+                    sys.exit(1)
 
             plugins.append(("~".join(name), plugin_pipe))
 
     return plugins
 
 
-def parse_plugin_piping(plugin: str) -> Union[str, List[str], None]:
+def parse_plugin_piping(plugin: str) -> str | list[str] | None:
     """
     Parses a plugin piping string like "plugin1|plugin2|plugin3" into a list of plugin modules.
     Each plugin is loaded using the load_plugins function.
@@ -425,7 +426,7 @@ def apply_plugin(
     init_content: Content,
     exclude_patterns=None,
     plugin_option_map=None,
-) -> List[Content]:
+) -> list[Content]:
     """
     Applies a plugin module's transform function to the given content if available.
     """
@@ -437,10 +438,10 @@ def apply_plugin(
     else:
         plugins.append((plugin_name, plugin_module))
 
-    contents: List[Content] = [init_content]
+    contents: list[Content] = [init_content]
 
     for name, module in plugins:
-        new_content: List[Content] = []
+        new_content: list[Content] = []
         if hasattr(module, "transform"):
             # Check if the plugin's transform function accepts plugin_option parameter
             sig = inspect.signature(module.transform)
@@ -472,7 +473,7 @@ def apply_plugin(
 
                 try:
                     res = module.transform(**args)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     print(f"\n[WARNING] Plugin '{name}' failed on entry, skipping: {e}")
                     continue
 
@@ -515,7 +516,7 @@ def parse_exclude_patterns(jailbreak, instruction):
 
 def _process_permutation_worker(
     perm, plugin_options_map, system_message_config, output_format
-) -> List[Entry]:
+) -> list[Entry]:
     """
     Worker function to process a single permutation (base_doc, jailbreak, instruction combination).
     Each thread gets its own asyncio event loop for async LLM operations.
@@ -596,7 +597,7 @@ def _process_permutation_worker(
         ]
 
         for plugin_name, plugin_module in plugins:
-            plugin_texts: List[Content] = (
+            plugin_texts: list[Content] = (
                 apply_plugin(
                     plugin_name,
                     plugin_module,
@@ -667,17 +668,17 @@ def _process_permutation_worker(
                                 )
 
                                 final_injected_doc = injected_doc
-                                if entry_type == EntryType.DOCUMENT:
-                                    if (
-                                        spotlighting_data_marker != "none"
-                                        and isinstance(get_content(injected_doc), str)
-                                    ):
-                                        final_injected_doc = content_factory(
-                                            spotlighting_data_marker.replace(
-                                                "DOCUMENT", get_content(injected_doc)
-                                            ),
-                                            get_content_type(injected_doc),
-                                        )
+                                if (
+                                    entry_type == EntryType.DOCUMENT
+                                    and spotlighting_data_marker != "none"
+                                    and isinstance(get_content(injected_doc), str)
+                                ):
+                                    final_injected_doc = content_factory(
+                                        spotlighting_data_marker.replace(
+                                            "DOCUMENT", get_content(injected_doc)
+                                        ),
+                                        get_content_type(injected_doc),
+                                    )
 
                                 entry = Entry(
                                     entry_type=entry_type,
@@ -708,7 +709,7 @@ def _process_permutation_worker(
                                 entries.append(entry)
     except ValueError:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"\n[ERROR] Processing permutation failed: {e}")
         import traceback
 
@@ -720,7 +721,7 @@ def _process_permutation_worker(
     return entries
 
 
-def _process_standalone_worker(perm, plugin_options_map) -> List[Entry]:
+def _process_standalone_worker(perm, plugin_options_map) -> list[Entry]:
     """
     Worker function to process a single standalone attack permutation.
     Each thread gets its own asyncio event loop for async LLM operations.
@@ -753,7 +754,7 @@ def _process_standalone_worker(perm, plugin_options_map) -> List[Entry]:
 
         combined_texts = []
         for plugin_name, plugin_module in plugins:
-            plugin_content: List[Content] = (
+            plugin_content: list[Content] = (
                 apply_plugin(
                     plugin_name,
                     plugin_module,
@@ -820,7 +821,7 @@ def _process_standalone_worker(perm, plugin_options_map) -> List[Entry]:
 
     except ValueError:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"\n[ERROR] Processing standalone attack failed: {e}")
         import traceback
 
@@ -836,8 +837,8 @@ def process_standalone_attacks(
     standalone_attacks,
     dataset,
     entry_id,
-    adv_prefixes=[None],
-    adv_suffixes=[None],
+    adv_prefixes=None,
+    adv_suffixes=None,
     plugins=None,
     plugin_options_map=None,
     plugin_only=False,
@@ -854,8 +855,8 @@ def process_standalone_attacks(
     else:
         plugins = [(None, None)] + plugins if plugins else [(None, None)]
 
-    prefixes = adv_prefixes
-    suffixes = adv_suffixes
+    prefixes = [None] if adv_prefixes is None else adv_prefixes
+    suffixes = [None] if adv_suffixes is None else adv_suffixes
 
     # Normalise judge fields and build permutation list
     permutations = []
@@ -913,13 +914,13 @@ def process_standalone_attacks(
                     try:
                         entries = future.result()
                         new_entries.extend(entries)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         perm = futures[future]
                         print(
                             f"\n[ERROR] Standalone attack {perm['attack']['id']} failed: {e}"
                         )
                         executor.shutdown(wait=False, cancel_futures=True)
-                        exit(1)
+                        sys.exit(1)
                     bar.update(1)
                 bar.close()
             except KeyboardInterrupt:
@@ -960,8 +961,8 @@ def generate_variations(
     injection_delimiters,
     spotlighting_data_markers_list,
     plugins,
-    adv_prefixes=[None],
-    adv_suffixes=[None],
+    adv_prefixes=None,
+    adv_suffixes=None,
     output_format="full-prompt",
     match_languages=False,
     system_message_config=None,
@@ -982,8 +983,8 @@ def generate_variations(
     else:
         plugins = [(None, None)] + plugins if plugins else [(None, None)]
 
-    prefixes = adv_prefixes
-    suffixes = adv_suffixes
+    prefixes = [None] if adv_prefixes is None else adv_prefixes
+    suffixes = [None] if adv_suffixes is None else adv_suffixes
 
     # Define output format specific entry types
     match output_format:
@@ -1076,7 +1077,7 @@ def generate_variations(
                         entries = future.result()
                         dataset.extend(entries)
                         bar.update(1)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         perm = futures[future]
                         print(
                             f"\n[ERROR] Permutation failed (doc={perm['base_doc']['id']}, jb={perm['jailbreak']['id']}, instr={perm['instruction']['id']}): {e}"
@@ -1350,7 +1351,7 @@ def generate_dataset(args):
             )
     except ImportError as e:
         print(f"Missing dependency: {e}")
-        exit(1)
+        sys.exit(1)
 
     timestamp = int(time.time())
     seed_folder_name = os.path.basename(os.path.normpath(seed_folder))
@@ -1368,8 +1369,7 @@ def generate_dataset(args):
         output_file_path += f"-dataset-{timestamp}.txt"
         os.makedirs("datasets", exist_ok=True)
         with open(output_file_path, "w", encoding="utf-8") as f:
-            for payload in dataset:
-                f.write(payload + "\n")
+            f.writelines(payload + "\n" for payload in dataset)
     else:
         output_file_path += f"-dataset-{timestamp}.jsonl"
         os.makedirs("datasets", exist_ok=True)

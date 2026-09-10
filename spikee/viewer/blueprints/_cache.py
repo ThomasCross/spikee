@@ -14,7 +14,6 @@ import sys
 import threading
 
 from spikee.utilities.modules import collect_modules
-
 from spikee.viewer.blueprints._tags import _compute_tags
 
 _MODULE_TYPES = ("plugins", "attacks", "targets", "judges")
@@ -51,7 +50,7 @@ def warm_cache() -> None:
         _evict_sys_modules(module_type)
         try:
             all_names, _, _ = collect_modules(module_type)
-        except Exception:
+        except Exception:  # noqa: BLE001
             all_names = []
         for name in all_names:
             with _store_lock:

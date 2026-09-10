@@ -1,0 +1,115 @@
+<script>
+// Shared helpers for generate pages (datasets, seeds, ...).
+(function () {
+    window.spikee = window.spikee || {};
+
+    // Bootstrap modal that replaces window.prompt() (unavailable in embedded webviews).
+    // Resolves with the entered string, or null on cancel/Esc/X.
+    spikee.promptModal = function (title, initial) {
+        var html =
+            '<div class="modal fade" id="spikee-prompt-modal" tabindex="-1">' +
+            '  <div class="modal-dialog modal-dialog-centered">' +
+            '    <div class="modal-content">' +
+            '      <div class="modal-header py-2">' +
+            '        <h6 class="modal-title" id="spikee-prompt-title"></h6>' +
+            '        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>' +
+            '      </div>' +
+            '      <div class="modal-body">' +
+            '        <input type="text" class="form-control font-monospace small" id="spikee-prompt-input">' +
+            '      </div>' +
+            '      <div class="modal-footer py-2">' +
+            '        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>' +
+            '        <button type="button" class="btn btn-sm btn-spikee" id="spikee-prompt-ok">OK</button>' +
+            '      </div>' +
+            '    </div>' +
+            '  </div>' +
+            '</div>';
+        document.body.insertAdjacentHTML('beforeend', html);
+        document.getElementById('spikee-prompt-title').textContent = title;
+        var input = document.getElementById('spikee-prompt-input');
+        input.value = initial;
+        return new Promise(function (resolve) {
+            var modalEl = document.getElementById('spikee-prompt-modal');
+            var modal = new bootstrap.Modal(modalEl);
+            var settled = false;
+            function close(result) {
+                if (settled) return;
+                settled = true;
+                modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                modal.hide();
+                resolve(result);
+            }
+            function onHidden() {
+                modalEl.remove();
+                close(null);
+            }
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); close(input.value); }
+            });
+            document.getElementById('spikee-prompt-ok').addEventListener('click', function () {
+                close(input.value);
+            });
+            modalEl.addEventListener('hidden.bs.modal', onHidden);
+            modal.show();
+            modalEl.addEventListener('shown.bs.modal', function () {
+                input.focus();
+                input.select();
+            }, { once: true });
+        });
+    };
+
+    // fetch() with JSON body; on non-OK throws the backend error.
+    spikee.fetchJson = function (url, opts) {
+        opts = opts || {};
+        opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+        return fetch(url, opts).then(function (res) {
+            if (!res.ok) return res.json().catch(function () { return {}; })
+                .then(function (body) {
+                    throw new Error((body && body.description) || 'HTTP ' + res.status);
+                });
+            return res.json().catch(function () { return {}; });
+        });
+    };
+
+    // Remove a card column by data-name and re-sync any selection UI.
+    spikee.removeCard = function (name) {
+        var el = document.querySelector('[data-name="' + name + '"]');
+        var card = el ? (el.closest('.col-12') || el) : null;
+        if (card) card.remove();
+        var countEl = document.getElementById('selection-count');
+        if (countEl) {
+            var checked = document.querySelectorAll('input[type="checkbox"]:checked').length;
+            countEl.textContent = checked + ' selected';
+        }
+    };
+
+    // Sequentially run fn(name) over a list of names, one at a time.
+    // Returns a promise that resolves when all names have been processed.
+    spikee.eachSequential = function (names, fn) {
+        return names.reduce(function (chain, name) {
+            return chain.then(function () { return Promise.resolve(fn(name)); });
+        }, Promise.resolve());
+    };
+
+    // After a successful rename, update the card in place: data-name attributes,
+    // the name label, and any href whose URL contains the old name (encoded or not).
+    spikee.updateCardName = function (oldName, newName) {
+        var oldE = encodeURIComponent(oldName), newE = encodeURIComponent(newName);
+        document.querySelectorAll('[data-name]').forEach(function (el) {
+            if (el.getAttribute('data-name') !== oldName) return;
+            el.setAttribute('data-name', newName);
+            el.querySelectorAll('[href]').forEach(function (link) {
+                var href = link.getAttribute('href') || '';
+                href = href.split(oldE).join(newE).split(oldName).join(newName);
+                link.setAttribute('href', href);
+            });
+            var ownHref = el.getAttribute('href');
+            if (ownHref) {
+                el.setAttribute('href', ownHref.split(oldE).join(newE).split(oldName).join(newName));
+            }
+            var label = el.querySelector('.text-break');
+            if (label) label.textContent = newName;
+        });
+    };
+})();
+</script>

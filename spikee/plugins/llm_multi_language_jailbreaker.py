@@ -9,14 +9,13 @@ Usage:
 """
 
 import random
-from typing import List, Optional, Union
 
 from spikee.templates.plugin import Plugin
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.llm import get_llm
 from spikee.utilities.llm_message import HumanMessage
-from spikee.utilities.modules import parse_options, extract_json_or_fail
+from spikee.utilities.modules import extract_json_or_fail, parse_options
 
 SPIKEE_MULTI_LANGUAGE_JAILBREAKER_PROMPT = """
 ###Instructions###
@@ -110,9 +109,10 @@ class LLMMultiLanguageJailbreaker(Plugin):
         return int(opts.get("variants", self.VARIANTS))
 
     def _generate_multi_language_jailbreak_attack(
-        self, llm, objective: str, lang: str, attempted_langs: List[str] = []
+        self, llm, objective: str, lang: str, attempted_langs: list[str] | None = None
     ) -> str:
         """Generate a multi language jailbreak attack using the LLM."""
+        attempted_langs = [] if attempted_langs is None else attempted_langs
         prompt = HumanMessage(
             SPIKEE_MULTI_LANGUAGE_JAILBREAKER_PROMPT.replace("{{objective}}", objective)
             .replace("{{lang}}", lang)
@@ -126,7 +126,7 @@ class LLMMultiLanguageJailbreaker(Plugin):
         response = llm.invoke([prompt]).content.strip()
 
         if not isinstance(response, str):
-            raise RuntimeError("LLM response is not a string as expected.")
+            raise TypeError("LLM response is not a string as expected.")
 
         obj = extract_json_or_fail(response)
         attack_prompt = obj.get("attack_prompt", "")
@@ -137,9 +137,9 @@ class LLMMultiLanguageJailbreaker(Plugin):
     def transform(
         self,
         content: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
-    ) -> Union[str, List[str]]:
+    ) -> str | list[str]:
         opts = parse_options(plugin_option)
         llm_model = opts.get("model", self.DEFAULT_MODEL)
         variants = int(opts.get("variants", self.VARIANTS))
@@ -163,9 +163,9 @@ class LLMMultiLanguageJailbreaker(Plugin):
                         llm, content, lang, list(used_langs)
                     )
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(
-                    f"[LLMMultiLanguageJailbreaker] Error generating prompt {i}: {str(e)}"
+                    f"[LLMMultiLanguageJailbreaker] Error generating prompt {i}: {e!s}"
                 )
 
         return attack_prompts

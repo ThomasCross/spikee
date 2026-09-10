@@ -1,11 +1,11 @@
 import importlib
 import inspect
-import os
-import re
 import json
+import os
 import pkgutil
-from typing import Any, Dict, Optional, List, Tuple
+import re
 from pathlib import Path
+from typing import Any
 
 
 def _resolve_impl_class(module, module_type):
@@ -96,7 +96,7 @@ def load_module_from_path(name, module_type):
     return mod
 
 
-def collect_seeds() -> List[str]:
+def collect_seeds() -> list[str]:
     """Collects available seeds from workspace"""
 
     path = Path(os.getcwd(), "datasets")
@@ -123,7 +123,7 @@ def collect_seeds() -> List[str]:
     return seeds
 
 
-def collect_datasets() -> List[str]:
+def collect_datasets() -> list[str]:
     """Collects available datasets from workspace"""
 
     path = Path(os.getcwd(), "datasets")
@@ -137,7 +137,7 @@ def collect_datasets() -> List[str]:
     return datasets
 
 
-def collect_modules(module_type: str) -> Tuple[List[str], List[str], List[str]]:
+def collect_modules(module_type: str) -> tuple[list[str], list[str], list[str]]:
     """Collects available module names from both local and built-in sources."""
 
     # 1) Collect from local directory
@@ -219,8 +219,8 @@ def get_default_option(module, module_type=None):
     return available[0] if available else None
 
 
-def parse_options(option: Optional[str]) -> Dict[str, str]:
-    opts: Dict[str, str] = {}
+def parse_options(option: str | None) -> dict[str, str]:
+    opts: dict[str, str] = {}
     if not option:
         return opts
     for p in (x.strip() for x in option.split(",") if x.strip()):
@@ -230,7 +230,7 @@ def parse_options(option: Optional[str]) -> Dict[str, str]:
     return opts
 
 
-def extract_json_or_fail(text: str) -> Dict[str, Any]:
+def extract_json_or_fail(text: str) -> dict[str, Any]:
     """
     Robust JSON extractor.
     """
@@ -242,7 +242,7 @@ def extract_json_or_fail(text: str) -> Dict[str, Any]:
     # 1) try direct JSON parse first (before any extraction that might corrupt content)
     try:
         return json.loads(t)
-    except Exception:
+    except json.JSONDecodeError:
         pass
 
     # 2) fenced code block — only attempt if direct parse failed
@@ -251,14 +251,14 @@ def extract_json_or_fail(text: str) -> Dict[str, Any]:
         t_fenced = m.group(1).strip()
         try:
             return json.loads(t_fenced)
-        except Exception:
+        except json.JSONDecodeError:
             pass
 
     # 3) fix unescaped quotes and try again
     t_fixed = fix_unescaped_quotes(t)
     try:
         return json.loads(t_fixed)
-    except Exception:
+    except json.JSONDecodeError:
         pass
 
     # 4) scan for first balanced {...}
@@ -276,7 +276,7 @@ def extract_json_or_fail(text: str) -> Dict[str, Any]:
                     candidate = t[start : i + 1]
                     try:
                         return json.loads(candidate)
-                    except Exception:
+                    except json.JSONDecodeError:
                         start = -1
 
     raise RuntimeError(f"LLM did not return valid JSON object: \n\n {text}")

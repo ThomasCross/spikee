@@ -1,16 +1,14 @@
-from typing import Optional, Union
-
-from spikee.templates.target import Target
 from spikee.templates.provider import Provider
-from spikee.utilities.llm import get_llm
-from spikee.utilities.llm_message import HumanMessage, SystemMessage
+from spikee.templates.target import Target
+from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import (
     ModuleDescriptionHint,
     ModuleOptionsHint,
-    get_content,
     TargetResponseHint,
+    get_content,
 )
-from spikee.utilities.enums import ModuleTag
+from spikee.utilities.llm import get_llm
+from spikee.utilities.llm_message import HumanMessage, SystemMessage
 from spikee.utilities.modules import parse_options
 
 
@@ -18,8 +16,8 @@ class LLMProvider(Target):
     def __init__(
         self,
         provider=None,
-        default_model: Union[str, None] = None,
-        models: Union[dict, list, None] = None,
+        default_model: str | None = None,
+        models: dict | list | None = None,
     ):
         super().__init__()
         self._provider_name = provider
@@ -63,8 +61,8 @@ class LLMProvider(Target):
     def process_input(
         self,
         input_text: str,
-        system_message: Optional[str] = None,
-        target_options: Optional[str] = None,
+        system_message: str | None = None,
+        target_options: str | None = None,
         logprobs: bool = False,
     ) -> TargetResponseHint:
         """
@@ -109,7 +107,9 @@ class LLMProvider(Target):
 
             elif self._models is not None:
                 if isinstance(self._models, dict):
-                    model_id = f"{self._provider_name}/{list(self._models.keys())[0]}"
+                    model_id = (
+                        f"{self._provider_name}/{next(iter(self._models.keys()))}"
+                    )
 
                 elif isinstance(self._models, list):
                     model_id = f"{self._provider_name}/{self._models[0]}"
@@ -120,7 +120,7 @@ class LLMProvider(Target):
                 )
 
         if model_id is None:
-            raise ValueError(
+            raise TypeError(
                 "Unable to determine model_id. Please provide a valid model option."
             )
 
@@ -131,7 +131,7 @@ class LLMProvider(Target):
         llm = get_llm(model_id, max_tokens=max_tokens, temperature=temperature)
 
         if not isinstance(llm, Provider):
-            raise ValueError(
+            raise TypeError(
                 f"Specified model '{model_id}' does not correspond to a valid Provider instance. Please check your provider and model options."
             )
 
@@ -147,12 +147,7 @@ class LLMProvider(Target):
         messages.append(HumanMessage(input_text))
 
         # Invoke model
-        try:
-            response = llm.invoke(messages)
-
-        except Exception as e:
-            print(f"Error during provider model completion ({model_id}): {e}")
-            raise
+        response = llm.invoke(messages)
 
         response_content = get_content(response.content)
 
@@ -176,5 +171,5 @@ if __name__ == "__main__":
                 "Hello!", target_options="model=bedrock/claude37-sonnet"
             )
         )
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001
         print("Error:", err)

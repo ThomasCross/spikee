@@ -4,12 +4,11 @@ Google Translate Plugin
 Requires: pip install "spikee[google-translate]"
 """
 
-from typing import List, Optional
 import asyncio
 
 from spikee.templates.plugin import Plugin
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.modules import parse_options
 
 DEFAULT_SOURCE_LANGUAGE = "en"  # Default source language for translation
@@ -33,7 +32,7 @@ class GoogleTranslator(Plugin):
     def transform(
         self,
         content: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
     ) -> str:
         """
