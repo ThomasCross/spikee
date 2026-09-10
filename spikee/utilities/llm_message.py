@@ -1,6 +1,7 @@
-from typing import Dict, List, Any, Union, Sequence
+from collections.abc import Sequence
+from typing import Any
 
-from spikee.utilities.hinting import Content, get_content_type, get_content
+from spikee.utilities.hinting import Content, get_content, get_content_type
 
 
 class Message:
@@ -14,14 +15,14 @@ class Message:
         return get_content_type(self.content)
 
     @property
-    def contents(self) -> List[Content]:
+    def contents(self) -> list[Content]:
         """For compatibility with list representation of contents"""
         return [self.content]
 
-    def to_dict(self) -> Dict[str, Union[str, Content]]:
+    def to_dict(self) -> dict[str, str | Content]:
         return {"role": self.role, "content": self.content}
 
-    def formatted_dict(self) -> Dict[str, str]:
+    def formatted_dict(self) -> dict[str, str]:
         return {"role": self.role, "content": get_content(self.content)}
 
 
@@ -47,13 +48,13 @@ class AIMessage(Message):
         return self.metadata.get("original_response", None)
 
 
-MessageHint = Union[str, Sequence[Union[Message, dict, tuple, str, Content]]]
+MessageHint = str | Sequence[Message | dict | tuple | str | Content]
 
 
 def format_messages(
     messages: MessageHint,
     bedrock_format: bool = False,
-) -> List[Dict[str, Union[str, List[str]]]]:
+) -> list[dict[str, str | list[str]]]:
     """Convert various message formats (string, dict, tuple, Message objects) into a standardized list of dicts with 'role' and 'content' keys."""
     formatted_messages = []
     if isinstance(messages, str):
@@ -74,12 +75,7 @@ def format_messages(
                 role, content = msg
                 formatted_messages.append({"role": role, "content": content})
 
-            elif (
-                isinstance(msg, Message)
-                or isinstance(msg, SystemMessage)
-                or isinstance(msg, HumanMessage)
-                or isinstance(msg, AIMessage)
-            ):
+            elif isinstance(msg, (Message, SystemMessage, HumanMessage, AIMessage)):
                 formatted_messages.append(msg.formatted_dict())
 
             elif isinstance(msg, Content):
@@ -87,10 +83,10 @@ def format_messages(
                 formatted_messages.append({"role": "user", "content": get_content(msg)})
 
             else:
-                raise ValueError(f"Unsupported message format type: {type(msg)}.")
+                raise TypeError(f"Unsupported message format type: {type(msg)}.")
 
     else:
-        raise ValueError(f"Unsupported messages format type: {type(messages)}.")
+        raise TypeError(f"Unsupported messages format type: {type(messages)}.")
 
     if bedrock_format:
         # Bedrock expects messages in the format: {"role": "user", "content": ["message content"]}
@@ -103,7 +99,7 @@ def format_messages(
 
 def upgrade_messages(
     messages: MessageHint,
-) -> List[Message]:
+) -> list[Message]:
     """Upgrade various message formats (string, dict, tuple, Message objects) into a standardized list of Message objects."""
     upgraded_messages = []
     if isinstance(messages, str):
@@ -126,22 +122,17 @@ def upgrade_messages(
                 role, content = msg
                 upgraded_messages.append(Message(role=role, content=content))
 
-            elif (
-                isinstance(msg, Message)
-                or isinstance(msg, SystemMessage)
-                or isinstance(msg, HumanMessage)
-                or isinstance(msg, AIMessage)
-            ):
+            elif isinstance(msg, (Message, SystemMessage, HumanMessage, AIMessage)):
                 upgraded_messages.append(msg)
 
             elif isinstance(msg, Content):
                 upgraded_messages.append(Message(role="user", content=msg))
 
             else:
-                raise ValueError(f"Unsupported message format type: {type(msg)}.")
+                raise TypeError(f"Unsupported message format type: {type(msg)}.")
 
     else:
-        raise ValueError(f"Unsupported messages format type: {type(messages)}.")
+        raise TypeError(f"Unsupported messages format type: {type(messages)}.")
 
     return upgraded_messages
 

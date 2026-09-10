@@ -9,14 +9,14 @@ Usage:
     spikee generate --plugins prompt_decomposition --plugin-options "prompt_decomposition:variants=15;mode=gpt4o-mini"
 """
 
-from typing import List, Union, Optional
 import json
 import random
+
 from dotenv import load_dotenv
 
 from spikee.templates.plugin import Plugin
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.llm import get_llm
 from spikee.utilities.llm_message import HumanMessage, SystemMessage
 
@@ -66,7 +66,7 @@ class PromptDecompositionPlugin(Plugin):
 
         return num_variants, mode
 
-    def _decompose_dumb(self, text: str, num_variants: int) -> List[str]:
+    def _decompose_dumb(self, text: str, num_variants: int) -> list[str]:
         """
         Splits the input into labeled chunks, shuffles them, and outputs naive structured rewrites.
         """
@@ -115,7 +115,7 @@ class PromptDecompositionPlugin(Plugin):
 
         return variations
 
-    def _decompose_llm(self, text: str, num_variants: int, mode: str) -> List[str]:
+    def _decompose_llm(self, text: str, num_variants: int, mode: str) -> list[str]:
         """
         Uses an LLM to decompose a prompt and return structured, shuffled, instructional variations.
         """
@@ -160,7 +160,7 @@ class PromptDecompositionPlugin(Plugin):
             response = llm.invoke(messages).content
 
             if not isinstance(response, str):
-                raise ValueError(
+                raise TypeError(
                     f"LLM response is not a string as expected, got {type(response)}."
                 )
 
@@ -182,7 +182,7 @@ class PromptDecompositionPlugin(Plugin):
             # If we got more, truncate
             return variations[:num_variants]
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error in LLM decomposition: {e}")
             # Fallback to dumb mode
             return self._decompose_dumb(text, num_variants)
@@ -190,9 +190,9 @@ class PromptDecompositionPlugin(Plugin):
     def transform(
         self,
         content: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
-    ) -> Union[str, List[str]]:
+    ) -> str | list[str]:
         """
         Decomposes a prompt into labeled components and generates shuffled variations.
 
@@ -232,5 +232,5 @@ if __name__ == "__main__":
         )
         for i, var in enumerate(result_llm, 1):
             print(f"{i}: {var}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"LLM test failed: {e}")

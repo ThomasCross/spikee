@@ -1,25 +1,33 @@
 import json
+import logging
 import os
-import pandas as pd  # Required for Excel conversion
+import sys
 import traceback
+
+import pandas as pd  # Required for Excel conversion
 from tqdm import tqdm
 
 from .judge import annotate_judge_options, call_judge
 from .utilities.files import (
+    build_resource_name,
+    extract_directory_from_file_path,
+    extract_prefix_from_file_name,
+    prepare_output_file,
+    process_jsonl_input_files,
     read_jsonl_file,
     write_jsonl_file,
-    process_jsonl_input_files,
-    extract_prefix_from_file_name,
-    extract_directory_from_file_path,
-    build_resource_name,
-    prepare_output_file,
 )
 from .utilities.results import (
-    preprocess_results,
     ResultProcessor,
-    generate_query,
+    attack_parent_id,
     extract_entries,
+    generate_query,
+    group_entries_with_attacks,
+    is_attack_entry,
+    preprocess_results,
 )
+
+logger = logging.getLogger(__name__)
 from .utilities.tags import validate_and_get_tag
 
 
@@ -41,7 +49,7 @@ def analyze_results(args):
         print(
             f"[Error] false positive checks cannot be used when analyzing multiple results. Currently selected {len(result_files)} results."
         )
-        exit(1)
+        sys.exit(1)
 
     print("[Overview] Analyzing the following file(s): ")
     print(" - " + "\n - ".join(result_files))
@@ -101,7 +109,7 @@ def rejudge_results(args):
 
         # Obtain file names
         file_dir = extract_directory_from_file_path(result_file)
-        prefix, resource_name = extract_prefix_from_file_name(result_file)
+        _, resource_name = extract_prefix_from_file_name(result_file)
 
         # Obtain results to re-judge and annotate judge options
         results = read_jsonl_file(result_file)
@@ -131,7 +139,10 @@ def rejudge_results(args):
                             newest = age
                             output_file = file
 
-                    except Exception:
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Skipping invalid rejudge filename %s: %s", file, exc
+                        )
                         continue
 
             # Resume file exists
@@ -178,7 +189,7 @@ def rejudge_results(args):
                         try:
                             entry["success"] = call_judge(entry, entry["response"])
 
-                        except Exception as e:
+                        except Exception as e:  # noqa: BLE001
                             error_message = str(e)
                             entry["success"] = False
                             print("[Error] {}: {}".format(entry["id"], error_message))
@@ -220,14 +231,14 @@ def extract_results(args):
         print(
             f"[Error] Invalid category '{category}' specified for extraction. Must be one of: success, failure, error, guardrail, no-guardrail, custom."
         )
-        exit(1)
+        sys.exit(1)
 
     # Custom Category
     custom_query = None
     if args.category == "custom":
         if args.custom_search is None:
             print("[Error] Custom search requires the --custom_value to be specified.")
-            exit(1)
+            sys.exit(1)
         else:
             custom_query = generate_query(category, args.custom_search.split(","))
 
@@ -252,6 +263,8 @@ def extract_results(args):
 
             if extract_entries(entry, category, custom_query):
                 id_count += 1
+                entry["result_parent_id"] = attack_parent_id(entry)
+                entry["result_origin"] = entry.get("result_origin", result_file)
                 entry["original_id"] = entry["id"]
                 entry["id"] = id_count
                 entry["long_id"] = f"{entry['long_id']}_extracted_{source}"
@@ -277,10 +290,35 @@ def dataset_comparison(args):
     )
     results = {}
     for result_file in result_files:
-        file_results = {
-            r.get("long_id", "").removesuffix("-ERROR"): r
-            for r in read_jsonl_file(result_file)
-        }
+        rows = read_jsonl_file(result_file)
+        groups, _ = group_entries_with_attacks(rows)
+        file_results = {}
+        dataset_ids = {str(e["id"]): e["long_id"] for e in dataset}
+        for group in groups.values():
+            original = next((r for r in group if not is_attack_entry(r)), None)
+            parent_long_id = next(
+                (
+                    r["attack_parent_long_id"]
+                    for r in group
+                    if "attack_parent_long_id" in r
+                ),
+                None,
+            )
+            if parent_long_id is None and original:
+                parent_long_id = original.get("long_id", "").removesuffix("-ERROR")
+            if parent_long_id is None:
+                # Legacy attack-only files have no parent long_id. Verify the
+                # old attack suffix against the dataset before associating it.
+                candidate = dataset_ids.get(str(attack_parent_id(group[0])))
+                if candidate and any(
+                    r.get("long_id", "").removesuffix("-ERROR")
+                    == candidate + "-" + str(r.get("attack_name"))
+                    for r in group
+                ):
+                    parent_long_id = candidate
+            if parent_long_id is not None:
+                result = file_results.setdefault(parent_long_id, {"success": False})
+                result["success"] |= any(r.get("success", False) for r in group)
         results[result_file] = file_results
 
     print(

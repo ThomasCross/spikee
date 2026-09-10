@@ -27,7 +27,7 @@
   </p>
 </div>
 
-_Version: 0.9.1-dev_
+_Version: 0.9.2-dev_
 
 
 Developed by Reversec Labs, `spikee` is a toolkit for assessing the resilience of LLMs, guardrails, and applications against prompt injection and jailbreaking. Spikee's strength is its modular design, which allows for easy customization of every part of the testing process.
@@ -363,9 +363,9 @@ See [_LLM Providers (`SPIKEE_API_TIMEOUT`)_](./docs/03_llm_providers.md#global-t
                         --category success
   ```
 
-`spikee viewer results` launches a web viewer for interactively exploring results files, with filtering and searching capabilities.
-  ``` bash
-  spikee viewer results --result-folder .\results\
+`spikee webui` launches the Spikee Web UI for interactively generating datasets, running tests, monitoring jobs, and exploring results.
+  ```bash
+  spikee webui -p <port> 
   ```
 
 

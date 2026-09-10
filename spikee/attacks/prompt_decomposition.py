@@ -14,17 +14,18 @@ Usage:
 
 import json
 import random
-from typing import Callable, List
+from collections.abc import Callable
 
-from spikee.tester import AdvancedTargetWrapper
 from spikee.templates.attack import Attack
+from spikee.tester import AdvancedTargetWrapper
+from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import (
+    AttackAttempt,
+    AttackResponseHint,
     ModuleDescriptionHint,
     ModuleOptionsHint,
-    AttackResponseHint,
     process_target_content,
 )
-from spikee.utilities.enums import ModuleTag
 from spikee.utilities.llm import get_llm
 from spikee.utilities.llm_message import HumanMessage, SystemMessage
 
@@ -54,7 +55,7 @@ class PromptDecompositionAttack(Attack):
 
         return self.DEFAULT_MODE
 
-    def _generate_variants_dumb(self, text: str) -> List[str]:
+    def _generate_variants_dumb(self, text: str) -> list[str]:
         """
         Splits the input into labeled chunks, shuffles them, and outputs structured rewrites.
         """
@@ -121,7 +122,7 @@ class PromptDecompositionAttack(Attack):
 
     def _generate_variants_llm(
         self, text: str, mode: str, max_iterations: int
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Uses an LLM to decompose a prompt into meaningful components and generate
         variations that present those parts in shuffled order with instructions.
@@ -206,12 +207,12 @@ class PromptDecompositionAttack(Attack):
                                 variations.append(data["variation"])
                         except json.JSONDecodeError:
                             continue
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass  # Ignore errors in the additional generation
 
             return variations if variations else [text]
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error generating LLM variants: {e}")
             return [text]  # Return original text as fallback
 
@@ -224,11 +225,13 @@ class PromptDecompositionAttack(Attack):
         attempts_bar=None,
         bar_lock=None,
         attack_option: str = "",
+        return_all_attempts: bool = False,
     ) -> AttackResponseHint:
         """
         Executes the prompt decomposition attack by sequentially trying different
         reformulations until success or max_iterations is reached.
         """
+        history = []
         original_text = entry.get("content", entry.get("text", ""))
         if entry.get("content_type", "text") != "text":
             raise ValueError(
@@ -253,6 +256,10 @@ class PromptDecompositionAttack(Attack):
 
             # If no variants were generated, return early
             if not variants:
+                if return_all_attempts:
+                    return [
+                        AttackAttempt(last_payload, last_response, False, attempts=0)
+                    ]
                 return 0, False, last_payload, last_response
 
             # If we have more variants than max_iterations, randomly sample
@@ -263,6 +270,7 @@ class PromptDecompositionAttack(Attack):
             for i, candidate_text in enumerate(variants, 1):
                 last_payload = candidate_text
 
+                error = None
                 try:
                     response = process_target_content(
                         target_module.process_input(candidate_text, system_message)
@@ -270,11 +278,19 @@ class PromptDecompositionAttack(Attack):
 
                     last_response = response
                     success = call_judge(entry, response)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
+                    error = str(e)
                     success = False
                     last_response = str(e)
                     print(
                         f"[Prompt-Decomposition] Entry ID {entry.get('id', 'unknown')}: {e}"
+                    )
+
+                if return_all_attempts:
+                    history.append(
+                        AttackAttempt(
+                            candidate_text, last_response, success, error=error
+                        )
                     )
 
                 # Update progress bar if provided
@@ -290,8 +306,12 @@ class PromptDecompositionAttack(Attack):
                             remaining = max_iterations - i
                             attempts_bar.total = attempts_bar.total - remaining
                             attempts_bar.refresh()
+                    if return_all_attempts:
+                        return history
                     return i, True, candidate_text, response
 
+            if return_all_attempts:
+                return history
             return (
                 min(len(variants), max_iterations),
                 False,
@@ -299,9 +319,14 @@ class PromptDecompositionAttack(Attack):
                 last_response,
             )
 
-        except ImportError as ie:
-            raise ie
+        except ImportError:
+            raise
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error in prompt decomposition attack: {e}")
+            if return_all_attempts:
+                history.append(
+                    AttackAttempt(last_payload, str(e), False, attempts=0, error=str(e))
+                )
+                return history
             return 0, False, last_payload, str(e)

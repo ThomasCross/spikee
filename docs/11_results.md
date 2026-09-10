@@ -166,20 +166,36 @@ spikee results dataset-comparison --dataset-file datasets/cybersec-2026-01-*.jso
                                   --number 10
 ```
 
-# The `spikee viewer results` Command
-This command processes results files and displays them in a Flask web application for interactive exploration.
+# The `spikee webui` Command
+Launches the Spikee web UI — a browser-based interface for the full Spikee workflow. Run it from a workspace directory (one initialised with `spikee init`).
 
-## Set-Up
-```bash
-# Add viewer components to workspace
-spikee init --include-viewer
-
-```
+The web UI covers:
+- **Generate** — configure and launch dataset generation jobs
+- **Test** — configure and launch test runs against targets
+- **Jobs** — monitor running jobs with live log output, cancel or re-run them
+- **Results** — explore, filter, and bulk-action test results interactively
 
 ## Usage Examples
 ```bash
-spikee viewer results --result-file results/results_cybersec-2025-04-*.jsonl 
+# Launch on the default host and port (127.0.0.1:8080)
+spikee webui
 
-# Specify a different host and port (Defaults, host=127.0.0.1, port=8080)
-spikee viewer --host 192.168.1.10 --port 8081 results --result-file results/results_cybersec-2025-04-*.jsonl 
+# Bind to all interfaces on a custom port
+spikee webui --host 0.0.0.0 -p 8081
+
+# Persist job history to a SQLite database across restarts
+spikee webui --database jobs.db
 ```
+## Representative results and full attack histories
+
+Result files can contain legacy representative attack rows, expanded per-attempt rows, or both (for example after resume or when combining runs). The default representative row has ID `<id>-attack` and `attempts=N`. With `--attack-return-all-attempts`, a supporting attack instead emits `<id>-attack-1` through `<id>-attack-N`, usually with `attempts=1` each. Do not add another aggregate row or sum cumulative ordinals.
+
+- **Dataset identity:** prefer `attack_parent_id` and `attack_parent_long_id`; older files use the `-attack` suffix. Source files distinguish otherwise identical IDs when combining results.
+- **Attempt identity:** `attack_attempt` is the ordinal across an entry's invocations; `attack_invocation` identifies the outer `--attempts` run. `attempts` is the additive count represented by that row.
+- **Statistics:** an original entry and all its attack rows count as one dataset entry. A group succeeds if any row succeeds. Per-attack totals/successes also count dataset entries, not retained rows. Attempt totals sum `attempts`. With one standard call and 20 dynamic attempts, the total is 21 in either format.
+- **Unjudged turns:** `success=null` means the attack did not judge that intermediate response. It is neither a demonstrated success nor a failed judgement. The viewer labels it UNJUDGED; failure extraction excludes it. Recording does not introduce extra judge calls. An unsuccessful attack group means no retained result demonstrates success, not that every turn was individually judged.
+- **Viewer:** the overview uses dataset groups; the entries page paginates individual result rows. Attempt cards and details show their ordinal and parent. Rejudge/toggle acts on the selected unique row.
+- **Extraction:** category filters select individual rows. Extraction assigns new row IDs while preserving `original_id`, `result_parent_id`, and `result_origin`, plus attack metadata. An extracted subset describes only its retained evidence; it is not the original run's ASR or total workload. These files remain compatible with analysis and rejudging.
+- **Dataset comparison:** associate dynamic outcomes with their original dataset entry and count a success at most once per result file. A successful intermediate result must not be overwritten by a later failed row.
+
+A representative row only contains its reported input and response; missing earlier payloads cannot be reconstructed from `attempts`. Multi-turn snapshots may contain context for that row, but do not imply independent trials. Preserve original files when interpreting mixed or extracted results.

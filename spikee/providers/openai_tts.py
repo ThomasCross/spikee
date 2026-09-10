@@ -12,17 +12,17 @@ Additional Args:
 
 import base64
 import os
+from collections.abc import Callable
 
 from spikee.templates.streaming_provider import StreamingProvider
-from spikee.utilities.hinting import ModuleDescriptionHint, Audio, get_content
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import Audio, ModuleDescriptionHint, get_content
 from spikee.utilities.llm_message import (
-    single_message,
     AIMessage,
     HumanMessage,
     MessageHint,
+    single_message,
 )
-from typing import Callable, Union, Dict, Tuple, Set
 
 
 class OpenAITTSProvider(StreamingProvider):
@@ -33,7 +33,7 @@ class OpenAITTSProvider(StreamingProvider):
         return "gpt-4o-mini-tts"
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {
             "gpt-4o-mini-tts": "gpt-4o-mini-tts",
             "tts-1-hd": "tts-1-hd",
@@ -41,14 +41,14 @@ class OpenAITTSProvider(StreamingProvider):
         }
 
     @property
-    def audio_formats(self) -> Set[str]:
+    def audio_formats(self) -> set[str]:
         return {"mp3", "opus", "aac", "flac", "wav", "pcm"}
 
     def setup(
         self,
         model: str,
-        max_tokens: Union[int, None] = None,
-        temperature: Union[float, None] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **additional_kwargs,
     ) -> None:
         self.model = model
@@ -77,7 +77,7 @@ class OpenAITTSProvider(StreamingProvider):
             ModuleTag.LLM_TTS,
         ], "TTS Provider for OpenAI text-to-speech models."
 
-    def _validate_messages(self, messages: MessageHint) -> Tuple[str, str]:
+    def _validate_messages(self, messages: MessageHint) -> tuple[str, str]:
         """Validate and extract instruction and text from messages."""
         msg, instruction = single_message(messages)
 
@@ -136,6 +136,7 @@ class OpenAITTSProvider(StreamingProvider):
 
 if __name__ == "__main__":
     import sys
+
     from dotenv import load_dotenv
 
     load_dotenv()

@@ -1,0 +1,181 @@
+{% extends "test/base.html" %}
+{% set active_test_page = "manual" %}
+{% block title %}Manual — Entry {{ index + 1 }} of {{ total }} | SPIKEE{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3">
+
+    {# ── Header row ── #}
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <div>
+            <h5 class="fw-semibold mb-0">{{ job.name }}</h5>
+            <span class="text-muted small">
+                Judge: <code>{{ judge_name }}</code>
+                {% if judge_args %}<span class="ms-2">Args: <code>{{ judge_args }}</code></span>{% endif %}
+                {% if judge_options %}<span class="ms-2 text-info">Options: <code>{{ judge_options }}</code></span>{% endif %}
+            </span>
+        </div>
+        <form method="post" action="/test/manual/{{ job.id }}/finish" class="mb-0">
+            <button type="submit" class="btn btn-sm btn-outline-secondary"
+                    onclick="return confirm('Finish session early?')">Finish Early</button>
+        </form>
+    </div>
+
+    {# ── Progress bar ── #}
+    <div class="mb-3">
+        <div class="d-flex justify-content-between small text-muted mb-1">
+            <span>Entry {{ index + 1 }} of {{ total }}</span>
+            <span>{{ ((index / total) * 100) | round(0) | int }}% complete</span>
+        </div>
+        <div class="progress" style="height:6px">
+            <div class="progress-bar bg-success" role="progressbar"
+                 style="width:{{ ((index / total) * 100) | round(0) | int }}%"
+                 aria-valuenow="{{ index }}" aria-valuemin="0" aria-valuemax="{{ total }}"></div>
+        </div>
+    </div>
+
+    {# ── Entry metadata ── #}
+    {% set jb = entry.get('jailbreak_id') or entry.get('jailbreak') %}
+    {% set instr = entry.get('instruction_id') or entry.get('instruction') %}
+    {% set pos = entry.get('position') %}
+    {% if jb or instr or pos or entry.get('lang') or entry.get('id') %}
+    <div class="d-flex flex-wrap gap-2 mb-3 small text-muted">
+        {% if entry.get('id') %}<span><span class="fw-semibold">ID:</span> <code>{{ entry.id }}</code></span>{% endif %}
+        {% if jb %}<span><span class="fw-semibold">Jailbreak:</span> {{ jb }}</span>{% endif %}
+        {% if instr %}<span><span class="fw-semibold">Instruction:</span> {{ instr }}</span>{% endif %}
+        {% if pos %}<span><span class="fw-semibold">Position:</span> {{ pos }}</span>{% endif %}
+        {% if entry.get('lang') %}<span><span class="fw-semibold">Lang:</span> {{ entry.lang }}</span>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if content_type != 'text' %}
+    <div class="alert alert-warning py-2 small mb-3">
+        This entry has content type <code>{{ content_type }}</code>. Only text is displayed.
+    </div>
+    {% endif %}
+
+    <div class="row g-3">
+
+        {# ── LEFT: Prompt ── #}
+        <div class="col-12 col-lg-6 d-flex flex-column gap-3">
+
+            <div class="card spikee-card h-100">
+                <div class="card-header py-2 px-3 small fw-semibold d-flex align-items-center justify-content-between">
+                    <span>Prompt</span>
+                    <button type="button" class="btn btn-xs btn-outline-secondary"
+                            id="copy-btn" onclick="copyPrompt()">Copy</button>
+                </div>
+                <div class="card-body p-0">
+                    <pre id="prompt-text" class="spikee-terminal m-0 rounded-0 rounded-bottom"
+                         style="max-height:420px;overflow-y:auto;white-space:pre-wrap;word-break:break-word">{{ content | e }}</pre>
+                </div>
+            </div>
+
+            {# Payload collapsible (shown when payload differs from content) #}
+            {% set payload = entry.get('payload') %}
+            {% if payload and payload != content %}
+            <details class="card spikee-card">
+                <summary class="card-header py-2 px-3 small fw-semibold" style="cursor:pointer;list-style:none">
+                    <span>&#9656; Payload</span>
+                </summary>
+                <div class="card-body p-0">
+                    <pre class="spikee-terminal m-0 rounded-0 rounded-bottom"
+                         style="max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-word">{{ payload | e }}</pre>
+                </div>
+            </details>
+            {% endif %}
+
+            {# System message collapsible #}
+            {% if entry.get('system_message') %}
+            <details class="card spikee-card">
+                <summary class="card-header py-2 px-3 small fw-semibold" style="cursor:pointer;list-style:none">
+                    <span>&#9656; System Message</span>
+                </summary>
+                <div class="card-body p-0">
+                    <pre class="spikee-terminal m-0 rounded-0 rounded-bottom"
+                         style="max-height:160px;overflow-y:auto;white-space:pre-wrap;word-break:break-word">{{ entry.system_message | e }}</pre>
+                </div>
+            </details>
+            {% endif %}
+
+        </div>
+
+        {# ── RIGHT: Response form ── #}
+        <div class="col-12 col-lg-6">
+
+            <form method="post" action="/test/manual/{{ job.id }}" id="response-form">
+
+                <div class="card spikee-card mb-3">
+                    <div class="card-header py-2 px-3 small fw-semibold">Response</div>
+                    <div class="card-body py-3 px-3">
+                        <textarea class="form-control form-control-sm font-monospace"
+                                  id="response_text" name="response_text"
+                                  rows="14"
+                                  placeholder="Paste the response here…"
+                                  style="resize:vertical"></textarea>
+                        <div class="form-text mt-1 text-muted">
+                            <strong>Auto-Judge</strong> runs <code>{{ judge_name }}</code> on the response.
+                            <strong>Pass</strong> / <strong>Fail</strong> override the judge.
+                        </div>
+                    </div>
+                </div>
+
+                {# Hidden fields set by JS before form submit #}
+                <input type="hidden" name="override" id="field-override" value="false">
+                <input type="hidden" name="override_success" id="field-override-success" value="">
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-success px-3"
+                            onclick="submitOverride(true)">Pass</button>
+                    <button type="button" class="btn btn-danger px-3"
+                            onclick="submitOverride(false)">Fail</button>
+                    <button type="submit" name="outcome" value="submitted"
+                            class="btn btn-spikee px-3">Auto-Judge</button>
+                    <button type="submit" name="outcome" value="skipped"
+                            class="btn btn-outline-secondary px-3">Skip</button>
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyPrompt() {
+    var text = document.getElementById('prompt-text').textContent;
+    navigator.clipboard.writeText(text).then(function () {
+        var btn = document.getElementById('copy-btn');
+        var orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(function () { btn.textContent = orig; }, 1500);
+    });
+}
+
+function submitOverride(success) {
+    document.getElementById('field-override').value = 'true';
+    document.getElementById('field-override-success').value = success ? 'true' : 'false';
+    // Trigger as outcome=submitted
+    var form = document.getElementById('response-form');
+    var hiddenOutcome = document.createElement('input');
+    hiddenOutcome.type = 'hidden';
+    hiddenOutcome.name = 'outcome';
+    hiddenOutcome.value = 'submitted';
+    form.appendChild(hiddenOutcome);
+    form.submit();
+}
+
+/* Auto-focus response textarea */
+document.getElementById('response_text').focus();
+
+/* Ctrl/Cmd+Enter triggers Auto-Judge */
+document.getElementById('response_text').addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        document.querySelector('[name=outcome][value=submitted]').click();
+    }
+});
+</script>
+{% endblock %}

@@ -48,7 +48,7 @@ class RegexJudge(Judge):
             return False
 
         else:
-            raise ValueError(
+            raise TypeError(
                 "judge_args must be a string or list of strings representing regex patterns."
             )
 

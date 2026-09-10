@@ -1,9 +1,8 @@
-from typing import Union
-
-from .judge import Judge
-from spikee.utilities.llm import get_llm
 from spikee.templates.provider import Provider
 from spikee.utilities.hinting import ModuleOptionsHint
+from spikee.utilities.llm import get_llm
+
+from .judge import Judge
 
 
 class LLMJudge(Judge):
@@ -19,7 +18,7 @@ class LLMJudge(Judge):
         """
         return [], True
 
-    def _get_llm(self, judge_options="") -> Union[Provider, None]:
+    def _get_llm(self, judge_options="") -> Provider | None:
         """
         Initialize and return the appropriate LLM based on judge_options.
         """

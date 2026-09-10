@@ -21,13 +21,15 @@ Returns:
     str: The transformed text.
 """
 
+from typing import ClassVar
+
 from spikee.templates.basic_plugin import BasicPlugin
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 
 
 class LeetspeekPlugin(BasicPlugin):
-    LEET_DICT = {
+    LEET_DICT: ClassVar[dict[str, str]] = {
         "A": "4",
         "a": "4",
         "E": "3",

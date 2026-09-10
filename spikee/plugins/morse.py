@@ -18,16 +18,18 @@ Returns:
     str: The transformed text in Morse code.
 """
 
+from typing import ClassVar
+
 from spikee.templates.basic_plugin import BasicPlugin
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 
 
 class MorsePlugin(BasicPlugin):
     def get_description(self) -> ModuleDescriptionHint:
         return [ModuleTag.ENCODING], "Transforms text into Morse code."
 
-    MORSE_CODE_DICT = {
+    MORSE_CODE_DICT: ClassVar[dict[str, str]] = {
         "A": ".-",
         "B": "-...",
         "C": "-.-.",

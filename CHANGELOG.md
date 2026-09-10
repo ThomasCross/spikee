@@ -1,6 +1,36 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.9.1] - 2026-07-13
+
+### Features
+
+- add --version arg
+- add spikee webui (generate, test, results, manual prompting)
+- implement response validation and enhance debug logging in providers
+- add module debug command
+- add homoglyph encoding plugin (Unicode confusables)
+- add spikee init error handling
+
+### Fixes
+
+- force progress bar refresh after early completion updates in attack modules and tester
+- ensure standalone entries preserve instruction_type and jailbreak_type from seed data
+- delay progress bar updates in echo_chamber attack to prevent premature incrementing
+- ensure asyncio event loops are properly closed in worker threads
+- fix result viewer function references (string_to_colour → text_to_colour)
+- improve async call cleanup by forcing garbage collection and handling pending tasks
+
+
+### Changes
+
+- refactor plugin and attack handling in generation UI
+- add `_invoke` function to providers to enable built-in debugging and management.
+- add MessageHint
+- add GTR to breakdowns and update overview labels
+
+## [0.9.0] - 2026-07-13
+
 ## [0.8.0] - 2026-05-19
 
 ### Features

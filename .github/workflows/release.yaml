@@ -1,4 +1,4 @@
-name: Manual Release (auto-bump)
+name: Prepare Release
 
 on:
   workflow_dispatch:
@@ -14,17 +14,11 @@ on:
         type: boolean
 
 permissions:
-  contents: write  # needed to push commit + tag
-  pull-requests: write  # needed to open the post-release dev-bump PR
+  contents: write
+  pull-requests: write
 
 jobs:
-  tests:
-    if: github.event.inputs.skip_tests != 'true'
-    uses: ./.github/workflows/tests.yaml
-
-  release:
-    needs: tests
-    if: always() && (github.event.inputs.skip_tests == 'true' || needs.tests.result == 'success')
+  prepare-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,10 +41,30 @@ jobs:
             *) echo "Invalid release_type. Use: major | minor | patch"; exit 1;;
           esac
 
+      - name: Verify and fast-forward develop into release contents
+        shell: bash
+        run: |
+          git fetch origin develop
+          if ! git merge-base --is-ancestor HEAD origin/develop; then
+            echo "ERROR: main and develop have diverged. Resolve the branch conflict in a reviewed synchronization PR before preparing a release."
+            exit 1
+          fi
+          git merge --ff-only origin/develop
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.11"
+
+      - name: Validate merged release contents # Ruff pinned 10/09/2026
+        if: github.event.inputs.skip_tests != 'true' 
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff==0.16.6 pytest 
+          ruff format --check ./spikee/
+          ruff check ./spikee/
+          pip install .[all]
+          pytest tests/functional
 
       - name: Install tools
         run: pip install toml
@@ -219,75 +233,35 @@ jobs:
           } > "$new_file"
           mv "$new_file" CHANGELOG.md
 
-      - name: Commit and tag
-        shell: bash
-        run: |
-          VERSION="${{ steps.bump.outputs.new_version }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pyproject.toml spikee/__init__.py README.md CHANGELOG.md || true
-          git commit -m "Release ${VERSION}" || echo "No changes to commit."
-          git tag "v${VERSION}"
-          git push origin main --tags
-
-      - name: Install build tools
-        run: pip install --upgrade build twine
-
-      - name: Build
-        run: python -m build
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
-
-      - name: Open dev-bump PR to develop
+      - name: Create release pull request
+        id: create-release-branch
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          NEXT_DEV="${{ steps.bump.outputs.next_dev_version }}"
-          BRANCH="chore/bump-${NEXT_DEV}"
+          VERSION="${{ steps.bump.outputs.new_version }}"
+          RELEASE_BRANCH="release/v${VERSION}"
 
-          # Fetch develop so we can branch from it
-          git fetch origin develop
-          git checkout -b "${BRANCH}" origin/develop
-
-          python - <<EOF
-          import toml, pathlib, re
-          root = pathlib.Path(".")
-
-          # pyproject.toml
-          pp = root / "pyproject.toml"
-          data = toml.load(pp.open())
-          data["project"]["version"] = "${NEXT_DEV}"
-          pp.write_text(toml.dumps(data))
-
-          # __init__.py
-          initp = root / "spikee" / "__init__.py"
-          initp.write_text('__version__ = "${NEXT_DEV}"\n')
-
-          # README.md
-          readme = root / "README.md"
-          if readme.exists():
-              txt = readme.read_text()
-              new_txt, n = re.subn(r"(_Version:\s*)(\d+\.\d+\.\d+(?:-dev)?)(\s*_)",
-                                   rf"\g<1>${NEXT_DEV}\3", txt, count=1)
-              if n:
-                  readme.write_text(new_txt)
-                  print("Updated README.md to next dev version.")
-              else:
-                  print("NOTE: README.md version pattern not found; left unchanged.")
-          EOF
+          if git ls-remote --exit-code --heads origin "${RELEASE_BRANCH}"; then
+            echo "ERROR: Branch ${RELEASE_BRANCH} already exists."
+            exit 1
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pyproject.toml spikee/__init__.py README.md
-          git commit -m "chore: bump version to ${NEXT_DEV}"
-          git push origin "${BRANCH}"
+          git switch -c "${RELEASE_BRANCH}"
+          git add pyproject.toml spikee/__init__.py README.md CHANGELOG.md
+          git commit -m "Release ${VERSION}"
+          git push origin "${RELEASE_BRANCH}"
+          echo "release_branch=${RELEASE_BRANCH}" >> "$GITHUB_OUTPUT"
 
           gh pr create \
-            --base develop \
-            --head "${BRANCH}" \
-            --title "chore: bump version to ${NEXT_DEV}" \
-            --body "Automated post-release version bump from the release workflow."
+            --base main \
+            --head "${RELEASE_BRANCH}" \
+            --title "Release ${VERSION}" \
+            --body "Prepares release ${VERSION} from develop. Merging this pull request will trigger package publication and the next development-version bump."
+
+      - name: Delete release branch after failure
+        if: failure() && steps.create-release-branch.outputs.release_branch != ''
+        shell: bash
+        run: git push origin --delete "${{ steps.create-release-branch.outputs.release_branch }}"

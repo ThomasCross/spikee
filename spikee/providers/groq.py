@@ -1,10 +1,11 @@
+from typing import Any
+
 from any_llm import AnyLLM
-from typing import Union, Any, Dict
 
 from spikee.templates.provider import Provider
-from spikee.utilities.hinting import ModuleDescriptionHint
 from spikee.utilities.enums import ModuleTag
-from spikee.utilities.llm_message import format_messages, AIMessage, MessageHint
+from spikee.utilities.hinting import ModuleDescriptionHint
+from spikee.utilities.llm_message import AIMessage, MessageHint, format_messages
 
 
 class AnyLLMGroqProvider(Provider):
@@ -15,7 +16,7 @@ class AnyLLMGroqProvider(Provider):
         return "llama-3.1-8b-instant"
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {
             "distil-whisper-large-v3-en": "distil-whisper-large-v3-en",
             "gemma2-9b-it": "gemma2-9b-it",
@@ -29,8 +30,8 @@ class AnyLLMGroqProvider(Provider):
     def setup(
         self,
         model: str,
-        max_tokens: Union[int, None] = None,
-        temperature: Union[float, None] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **kwargs,
     ):
         self.model = model
@@ -49,7 +50,7 @@ class AnyLLMGroqProvider(Provider):
                 "[Import Error] Provider Module 'groq' is missing required packages for Groq. Please run `pip install spikee[groq]` to install them."
             )
 
-        options_kwargs: Dict[str, Any] = {}
+        options_kwargs: dict[str, Any] = {}
         if self.max_tokens is not None:
             options_kwargs["max_tokens"] = self.max_tokens
 

@@ -25,20 +25,20 @@ References:
 """
 
 import json
-import uuid
-import requests
-from typing import Optional
-from dotenv import load_dotenv
 import traceback
+import uuid
+
+import requests
+from dotenv import load_dotenv
 
 from spikee.templates.simple_multi_target import SimpleMultiTarget
 from spikee.utilities.enums import Turn
-from spikee.utilities.modules import parse_options
 from spikee.utilities.hinting import (
     ModuleDescriptionHint,
     ModuleOptionsHint,
     TargetResponseHint,
 )
+from spikee.utilities.modules import parse_options
 
 
 class SimpleTestChatbotTarget(SimpleMultiTarget):
@@ -69,7 +69,7 @@ class SimpleTestChatbotTarget(SimpleMultiTarget):
         message: str,
         model: str = "gpt-4o-mini",
         guardrail: str = "off",
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
     ) -> str:
         """Used to send messages to the Chatbot target, and update conversation history.
 
@@ -119,34 +119,31 @@ class SimpleTestChatbotTarget(SimpleMultiTarget):
         # However, simplistic joining:
         api_url = f"{url.rstrip('/')}/api/chat"
 
+        response = requests.post(
+            url=api_url,
+            headers={
+                "Content-Type": "application/json",
+            },
+            data=json.dumps(payload),
+            timeout=30,
+        )
+
+        response.raise_for_status()
+
         try:
-            response = requests.post(
-                url=api_url,
-                headers={
-                    "Content-Type": "application/json",
-                },
-                data=json.dumps(payload),
-                timeout=30,
+            resp_json = response.json()
+            # Try common keys
+            result = (
+                resp_json.get("response")
+                or resp_json.get("message")
+                or resp_json.get("content")
             )
+            if result is None:
+                # Fallback if no obvious key
+                result = str(resp_json)
+        except json.JSONDecodeError:
+            result = response.text
 
-            response.raise_for_status()
-
-            try:
-                resp_json = response.json()
-                # Try common keys
-                result = (
-                    resp_json.get("response")
-                    or resp_json.get("message")
-                    or resp_json.get("content")
-                )
-                if result is None:
-                    # Fallback if no obvious key
-                    result = str(resp_json)
-            except json.JSONDecodeError:
-                result = response.text
-
-        except requests.exceptions.RequestException as e:
-            raise e
         # --------------------------------
 
         return result
@@ -187,10 +184,10 @@ class SimpleTestChatbotTarget(SimpleMultiTarget):
     def process_input(
         self,
         input_text: str,
-        system_message: Optional[str] = None,
-        target_options: Optional[str] = None,
-        spikee_session_id: Optional[str] = None,
-        backtrack: Optional[bool] = False,
+        system_message: str | None = None,
+        target_options: str | None = None,
+        spikee_session_id: str | None = None,
+        backtrack: bool | None = False,
     ) -> TargetResponseHint:
 
         # ---- Determine the URL, model, and guardrail based on target options ----
@@ -300,5 +297,5 @@ if __name__ == "__main__":
         )
         print("Response:", response)
 
-    except Exception:
+    except Exception:  # noqa: BLE001
         traceback.print_exc()

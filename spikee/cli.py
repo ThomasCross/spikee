@@ -1,40 +1,41 @@
 # spikee/cli.py
 
 # At the top of cli.py, add these imports:
-import os
-import sys
-import shutil
 import argparse
-from . import __version__
-from dotenv import load_dotenv
+import os
+import shutil
+import sys
 from pathlib import Path
 
-from .generator import generate_dataset, generate_plugin
-from .tester import test_dataset
-from .results import (
-    analyze_results,
-    rejudge_results,
-    extract_results,
-    dataset_comparison,
-    convert_results_to_excel,
-)
-from .list import (
-    list_seeds,
-    list_datasets,
-    list_judges,
-    list_targets,
-    list_plugins,
-    list_attacks,
-    list_providers,
-)
+from dotenv import load_dotenv
+
+from . import __version__
 from .debug import (
-    debug_module_target,
+    debug_module_attack,
     debug_module_judge,
     debug_module_plugin,
-    debug_module_attack,
     debug_module_provider,
+    debug_module_target,
 )
-from .viewers.results import ResultsViewer
+from .generator import generate_dataset, generate_plugin
+from .list import (
+    list_attacks,
+    list_datasets,
+    list_judges,
+    list_plugins,
+    list_providers,
+    list_seeds,
+    list_targets,
+)
+from .results import (
+    analyze_results,
+    convert_results_to_excel,
+    dataset_comparison,
+    extract_results,
+    rejudge_results,
+)
+from .tester import test_dataset
+from .viewer.app import Viewer
 
 banner = r"""
    _____ _____ _____ _  ________ ______
@@ -115,12 +116,6 @@ def main():
         default="none",
         help="Copy built-in modules to local workspace (default: none)",
     )
-    parser_init.add_argument(
-        "--include-viewer",
-        action="store_true",
-        help="Include the built-in web viewer in the local workspace",
-    )
-    # endregion
 
     # region === [GENERATE] Sub-command ===============================================
     parser_generate = subparsers.add_parser("generate", help="Generate a dataset")
@@ -349,6 +344,11 @@ def main():
         help="Only run the attack module without standard attempts",
     )
     parser_test.add_argument(
+        "--attack-return-all-attempts",
+        action="store_true",
+        help="Retain every attempt from supporting attacks (default: one representative result)",
+    )
+    parser_test.add_argument(
         "--tag", default=None, help="Include a tag at the end of the results filename"
     )
     parser_test.add_argument(
@@ -528,56 +528,41 @@ def main():
     )
     # endregion
 
-    # region === [Viewer] Sub-command ================================================
-    parser_viewer = subparsers.add_parser("viewer", help="Launch local web viewers")
-    subparsers_viewer = parser_viewer.add_subparsers(
-        dest="viewer_command", help="Viewer sub-commands"
+    # === [WebUI] Sub-command ================================================
+    parser_viewer = subparsers.add_parser(
+        "webui",
+        help="Launch the Spikee web UI (run from a workspace directory)",
     )
     parser_viewer.add_argument(
         "--host",
         type=str,
         default="127.0.0.1",
-        help="Host address for the prompt viewer (default: 127.0.0.1)",
+        help="Host address for the web UI (default: 127.0.0.1)",
     )
     parser_viewer.add_argument(
         "-p",
         "--port",
         type=int,
         default=8080,
-        help="Port number for the prompt viewer (default: 8080)",
+        help="Port number for the web UI (default: 8080)",
     )
     parser_viewer.add_argument(
         "-d",
         "--debug",
         action="store_true",
-        help="Run the viewer in debug mode with hot-reloading (default: False)",
+        help="Run the web UI in debug mode with hot-reloading (default: False)",
     )
     parser_viewer.add_argument(
         "--truncate",
         type=int,
         default=500,
-        help="Truncate long prompt entries in the viewer for better performance (default: 500 characters, set to 0 to disable truncation)",
+        help="Truncate long text entries in the web UI (default: 500 chars, 0 to disable)",
     )
-
-    parser_result_viewer = subparsers_viewer.add_parser(
-        "results", help="Launch a local result viewer, for results JSONL files"
-    )
-    parser_result_viewer.add_argument(
-        "--result-file",
+    parser_viewer.add_argument(
+        "--database",
         type=str,
-        action="append",
-        help="Path to an results JSONL file, generated using the dataset",
-    )
-    parser_result_viewer.add_argument(
-        "--result-folder",
-        type=str,
-        action="append",
-        help="Path to a results folder containing multiple JSONL files, generated using the dataset",
-    )
-    parser_result_viewer.add_argument(
-        "--allow-ast",
-        action="store_true",
-        help="Allow AST parsing in the result viewer (use with caution)",
+        default=None,
+        help="Path to SQLite database for job persistence (created if absent)",
     )
 
     # --- convert-to-excel
@@ -739,6 +724,12 @@ def main():
         help="Options to pass to the attack module (if applicable)",
     )
 
+    attack_subparser.add_argument(
+        "--attack-return-all-attempts",
+        action="store_true",
+        help="Return history from supporting attack modules",
+    )
+
     # Provider-specific arguments
     provider_subparser.add_argument(
         "--max-tokens",
@@ -794,7 +785,6 @@ def main():
         init_workspace(
             force=args.force,
             include_builtin=args.include_builtin,
-            include_viewer=args.include_viewer,
         )
 
     elif args.command == "generate":
@@ -818,12 +808,9 @@ def main():
         else:
             parser_results.print_help()
 
-    elif args.command == "viewer":
-        if args.viewer_command == "results":
-            viewer = ResultsViewer(args)
-            viewer.run_viewer(args)
-        else:
-            parser_viewer.print_help()
+    elif args.command == "webui":
+        viewer = Viewer(args)
+        viewer.run()
 
     elif args.command == "list":
         if args.list_command == "seeds":
@@ -866,7 +853,7 @@ def main():
         sys.exit(1)
 
 
-def init_workspace(force=False, include_builtin="none", include_viewer=False):
+def init_workspace(force=False, include_builtin="none"):
     """
     Copy the entire 'data/workspace' directory from the installed package
     into the user's current working directory. This sets up the local spikee workspace
@@ -885,9 +872,6 @@ def init_workspace(force=False, include_builtin="none", include_viewer=False):
     for item in src_folder.iterdir():
         destination = workspace_dest / item.name
 
-        if item.name == "viewer" and not include_viewer:
-            continue
-
         if destination.exists() and not force:
             print(f"[init] '{destination}' already exists. Use --force to overwrite.")
             continue
@@ -905,7 +889,7 @@ def init_workspace(force=False, include_builtin="none", include_viewer=False):
             else:
                 shutil.copy2(item, destination)
             print(f"[init] Copied {item.name} --> {destination}")
-        except Exception as e:
+        except OSError as e:
             print(f"[init] Could not copy {item.name} to {destination}: {e}")
 
     print("[init] Local spikee workspace has been initialized.")
@@ -969,7 +953,7 @@ def copy_builtin_modules(include_option, force=False):
                     print(
                         f"[init] Copied built-in {module_type}/{file_path.name} to local workspace"
                     )
-                except Exception as e:
+                except OSError as e:
                     print(f"[init] Error copying {module_type}/{file_path.name}: {e}")
 
             if modules_copied > 0:
@@ -979,5 +963,5 @@ def copy_builtin_modules(include_option, force=False):
             else:
                 print(f"[init] No built-in {module_type} were copied")
 
-        except Exception as e:
+        except OSError as e:
             print(f"[init] Error processing {module_type}: {e}")

@@ -117,7 +117,7 @@ class TestGetContent:
 
     def test_extract_unsupported_type_raises_error(self):
         """Unsupported type should raise ValueError."""
-        with pytest.raises(ValueError, match="Unsupported content type"):
+        with pytest.raises(TypeError, match="Unsupported content type"):
             get_content(12345)  # Integer is not a Content type
 
     def test_extract_empty_content(self):

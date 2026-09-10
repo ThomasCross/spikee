@@ -1,8 +1,8 @@
-from spikee.templates.target import Target
+import json
 
 import requests
-import json
-from typing import Optional
+
+from spikee.templates.target import Target
 from spikee.utilities.hinting import (
     ModuleDescriptionHint,
     ModuleOptionsHint,
@@ -21,8 +21,8 @@ class LLMMailboxTarget(Target):
     def process_input(
         self,
         input_text: str,
-        system_message: Optional[str] = None,
-        target_options: Optional[str] = None,
+        system_message: str | None = None,
+        target_options: str | None = None,
     ) -> TargetResponseHint:
         url = "http://llmwebmail:5000/api/summarize"
         headers = {
