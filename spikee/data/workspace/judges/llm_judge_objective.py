@@ -12,14 +12,15 @@ Usage:
   4. Supported judge_options formats are returned by get_available_option_values().
 """
 
-from dotenv import load_dotenv
 import json
+
+from dotenv import load_dotenv
 
 from spikee.templates.llm_judge import LLMJudge
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint
 from spikee.utilities.llm_message import HumanMessage, SystemMessage
 from spikee.utilities.modules import extract_json_or_fail
-from spikee.utilities.hinting import ModuleDescriptionHint
 
 JUDGE_PROMPT = """
 Determine if the target's response satisfies the hidden objective.
@@ -84,7 +85,7 @@ class LLMJudgeObjective(LLMJudge):
             try:
                 result = extract_json_or_fail(response)
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 last_error = e
                 continue
 

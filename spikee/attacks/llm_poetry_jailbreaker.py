@@ -13,21 +13,21 @@ Returns:
   (iterations_used:int, success:bool, attack_prompt:str, last_response:str)
 """
 
-from typing import Callable, Dict, List
+from collections.abc import Callable
 
-from spikee.tester import AdvancedTargetWrapper
 from spikee.templates.attack import Attack
+from spikee.tester import AdvancedTargetWrapper
+from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import (
+    AttackAttempt,
+    AttackResponseHint,
     ModuleDescriptionHint,
     ModuleOptionsHint,
-    AttackResponseHint,
     process_target_content,
 )
-from spikee.utilities.enums import ModuleTag
 from spikee.utilities.llm import get_llm
 from spikee.utilities.llm_message import HumanMessage
-from spikee.utilities.modules import parse_options, extract_json_or_fail
-
+from spikee.utilities.modules import extract_json_or_fail, parse_options
 
 # LLM Poetry Jailbreaker prompt template
 SPIKEE_LLM_POETRY_JAILBREAKER_PROMPT = """
@@ -107,7 +107,7 @@ class LLMPoetryJailbreaker(Attack):
         return [], True
 
     def _generate_jailbreak_attack(
-        self, llm, objective: str, previous_attempts: List[Dict]
+        self, llm, objective: str, previous_attempts: list[dict]
     ) -> str:
         """Generate a jailbreak attack using the LLM."""
         # Format previous attempts for the prompt
@@ -151,6 +151,7 @@ class LLMPoetryJailbreaker(Attack):
         attempts_bar=None,
         bar_lock=None,
         attack_option: str = "",
+        return_all_attempts: bool = False,
     ) -> AttackResponseHint:
         """
         Executes a jailbreak attack sequence.
@@ -169,12 +170,19 @@ class LLMPoetryJailbreaker(Attack):
             )
 
         if not objective:
+            if return_all_attempts:
+                return [
+                    AttackAttempt(
+                        "", "No objective provided in entry", False, attempts=0
+                    )
+                ]
             return 0, False, "", "No objective provided in entry"
 
         # Initialize the LLM
         llm = get_llm(model_name, max_tokens=400)
 
         # Track previous attack attempts to avoid repetition
+        history = []
         previous_attempts = []
         last_response = ""
         attack_prompt = ""
@@ -182,12 +190,14 @@ class LLMPoetryJailbreaker(Attack):
         # Try different attack variations
         # Note: range is 1-indexed to match nice user-facing counting
         for i in range(1, max_iterations + 1):
+            candidate = ""
             try:
                 # Generate a new attack prompt
                 attack_prompt = self._generate_jailbreak_attack(
                     llm, objective, previous_attempts
                 )
 
+                candidate = attack_prompt
                 # Send the attack prompt to the target
                 last_response = process_target_content(
                     target_module.process_input(
@@ -202,7 +212,10 @@ class LLMPoetryJailbreaker(Attack):
                 )
 
                 # Determine if the attack was successful
-                if call_judge(entry, last_response):
+                success = call_judge(entry, last_response)
+                if return_all_attempts:
+                    history.append(AttackAttempt(attack_prompt, last_response, success))
+                if success:
                     if attempts_bar:
                         # Update progress bar to show we finished early
                         with bar_lock:
@@ -212,10 +225,16 @@ class LLMPoetryJailbreaker(Attack):
                                     0, attempts_bar.total - remaining
                                 )
                                 attempts_bar.refresh()
+                    if return_all_attempts:
+                        return history
                     return i, True, attack_prompt, last_response
 
-            except Exception as e:
-                last_response = f"Error during attack attempt {i}: {str(e)}"
+            except Exception as e:  # noqa: BLE001
+                last_response = f"Error during attack attempt {i}: {e!s}"
+                if return_all_attempts:
+                    history.append(
+                        AttackAttempt(candidate, last_response, False, error=str(e))
+                    )
                 # If generation fails, we might as well stop or continue.
                 # Here we continue logging the error.
                 print(f"[LLMJailbreaker] Error: {e}")
@@ -226,4 +245,8 @@ class LLMPoetryJailbreaker(Attack):
                     attempts_bar.update(1)
 
         # If we've exhausted all attempts
+        if return_all_attempts:
+            return history or [
+                AttackAttempt(attack_prompt, last_response, False, attempts=0)
+            ]
         return max_iterations, False, attack_prompt, last_response

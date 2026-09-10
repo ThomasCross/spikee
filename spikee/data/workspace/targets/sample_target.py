@@ -17,19 +17,19 @@ Return values:
         * False indicates the guardrail blocked the attack.
 """
 
-from dotenv import load_dotenv
 import json
+
 import requests
-from typing import Optional
+from dotenv import load_dotenv
 
 from spikee.templates.target import Target
 from spikee.tester import GuardrailTrigger
-from spikee.utilities.modules import parse_options
 from spikee.utilities.hinting import (
     ModuleDescriptionHint,
     ModuleOptionsHint,
     TargetResponseHint,
 )
+from spikee.utilities.modules import parse_options
 
 
 class SampleRequestTarget(Target):
@@ -45,8 +45,8 @@ class SampleRequestTarget(Target):
     def process_input(
         self,
         input_text: str,
-        system_message: Optional[str] = None,
-        target_options: Optional[str] = "",
+        system_message: str | None = None,
+        target_options: str | None = "",
     ) -> TargetResponseHint:
 
         # Option Validation `--target-options 'url=https://myapi.com/endpoint'` to override default URL
@@ -93,5 +93,5 @@ if __name__ == "__main__":
         target = SampleRequestTarget()
         response = target.process_input("Hello!")
         print(response)
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001
         print("Error:", err)

@@ -1,0 +1,97 @@
+{% extends "test/base.html" %}
+{% set active_test_page = "manual" %}
+{% block title %}Test — Manual | SPIKEE{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3">
+
+    <h5 class="fw-semibold mb-3">Manual Dataset Tester</h5>
+    <p class="text-muted small mb-3">
+        Step through a dataset one entry at a time. Copy each prompt to any external tool,
+        paste the response back, and mark it or let the entry's built-in judge auto-score it.
+    </p>
+
+    <form method="post" action="/test/manual/start">
+
+        <div class="card spikee-card mb-3">
+            <div class="card-header py-2 px-3 small fw-semibold">Session Setup</div>
+            <div class="card-body py-3 px-3">
+                <div class="row g-3">
+
+                    {# Dataset picker #}
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-semibold" for="dataset">
+                            Dataset <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select form-select-sm font-monospace" id="dataset" name="dataset" required>
+                            <option value="" disabled selected>— select a dataset —</option>
+                            {% for ds in datasets %}
+                            <option value="{{ ds }}">{{ ds }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if not datasets %}
+                        <div class="form-text text-warning">No datasets found in <code>datasets/</code>.</div>
+                        {% endif %}
+                    </div>
+
+                    {# Judge options override (optional) #}
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-semibold" for="judge_options">
+                            Judge Options <span class="fw-normal text-muted">(optional)</span>
+                        </label>
+                        <input type="text" class="form-control form-control-sm font-monospace"
+                               id="judge_options" name="judge_options"
+                               placeholder="e.g. model=openai/gpt-4o">
+                        <div class="form-text">
+                            Overrides the default options for whichever judge each entry specifies.
+                            Leave blank to use each judge's own default.
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="card spikee-card mb-3">
+            <div class="card-header py-2 px-3 small fw-semibold">Sampling &amp; Tag</div>
+            <div class="card-body py-3 px-3">
+                <div class="row g-3 align-items-end">
+
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <label class="form-label small fw-semibold" for="sample">Sample</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" class="form-control font-monospace"
+                                   id="sample" name="sample" min="0.01" max="0.99"
+                                   step="0.01" placeholder="1.0 (all)">
+                            <span class="input-group-text">0–1</span>
+                        </div>
+                        <div class="form-text">Fraction of dataset to test.</div>
+                    </div>
+
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <label class="form-label small fw-semibold" for="sample_seed">Sample Seed</label>
+                        <input type="text" class="form-control form-control-sm font-monospace"
+                               id="sample_seed" name="sample_seed" value="42" placeholder="42 or random">
+                        <div class="form-text">Reproducibility seed.</div>
+                    </div>
+
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <label class="form-label small fw-semibold" for="tag">Tag</label>
+                        <input type="text" class="form-control form-control-sm"
+                               id="tag" name="tag" placeholder="e.g. run-1">
+                        <div class="form-text">Appended to results filename.</div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-spikee px-4"
+                {% if not datasets %}disabled{% endif %}>
+            Start Session
+        </button>
+
+    </form>
+
+</div>
+{% endblock %}

@@ -10,7 +10,7 @@ import os
 import re
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from flask import (
     Blueprint,
@@ -23,6 +23,7 @@ from flask import (
     url_for,
 )
 
+from spikee.judge import call_judge
 from spikee.templates.standardised_conversation import StandardisedConversation
 from spikee.utilities.files import (
     extract_resource_name,
@@ -30,13 +31,12 @@ from spikee.utilities.files import (
     write_jsonl_file,
 )
 from spikee.utilities.results import ResultProcessor, extract_entries, generate_query
-from spikee.judge import call_judge
 
 results_bp = Blueprint("results", __name__)
 
 # ── Module-level file registry ────────────────────────────────────────────────
 # Maps resource_name -> absolute Path.  Populated by scan_result_files().
-loaded_files: Dict[str, Path] = {}
+loaded_files: dict[str, Path] = {}
 
 # ── Prefixes that count as result files ──────────────────────────────────────
 _RESULT_PREFIXES = ("results", "rejudge", "extract")
@@ -54,7 +54,7 @@ def scan_result_files() -> None:
     concurrent readers seeing a partially-rebuilt dict.
     """
     global loaded_files
-    new_files: Dict[str, Path] = {}
+    new_files: dict[str, Path] = {}
 
     results_dir = Path(os.getcwd()) / "results"
     if not results_dir.is_dir():
@@ -80,23 +80,23 @@ def scan_result_files() -> None:
     )
 
 
-def _build_file_tree() -> List[Tuple[str, List[str]]]:
+def _build_file_tree() -> list[tuple[str, list[str]]]:
     """
     Convert loaded_files into a list of (folder, [resource_names]) tuples
     suitable for the file-selector dropdown.
     folder="" means root-level.
     """
-    root: List[str] = []
-    folders: Dict[str, List[str]] = {}
+    root: list[str] = []
+    folders: dict[str, list[str]] = {}
 
     for key in loaded_files:
         if "/" in key:
-            folder, name = key.split("/", 1)
+            folder, _ = key.split("/", 1)
             folders.setdefault(folder, []).append(key)
         else:
             root.append(key)
 
-    tree: List[Tuple[str, List[str]]] = []
+    tree: list[tuple[str, list[str]]] = []
     if root:
         tree.append(("", root))
     for folder in sorted(folders):
@@ -104,7 +104,7 @@ def _build_file_tree() -> List[Tuple[str, List[str]]]:
     return tree
 
 
-def _files_for_selection(selected: str) -> Dict[str, Path]:
+def _files_for_selection(selected: str) -> dict[str, Path]:
     """
     Resolve a selection string to a dict of {resource_name: Path}.
     Selections:
@@ -126,8 +126,8 @@ def _files_for_selection(selected: str) -> Dict[str, Path]:
 
 
 def _load_result_data(
-    files: Dict[str, Path],
-) -> Tuple[Dict[str, Any], str, Any]:
+    files: dict[str, Path],
+) -> tuple[dict[str, Any], str, Any]:
     """
     Load and combine JSONL files into an entries dict + processor output string.
     Returns: (entries_dict, processor_output_html, ResultProcessor)
@@ -145,7 +145,7 @@ def _load_result_data(
     cached = getattr(g, cache_key, None)
     if cached is not None:
         return cached
-    entries: Dict[str, Any] = {}
+    entries: dict[str, Any] = {}
 
     for resource_name, path in files.items():
         rows = read_jsonl_file(str(path))
@@ -156,7 +156,7 @@ def _load_result_data(
                 backup = row["response"]
                 try:
                     row["response"] = json.loads(row["response"])
-                except Exception:
+                except Exception:  # noqa: BLE001
                     row["response"] = backup
 
             key = f"{resource_name}-{row['id']}"
@@ -197,7 +197,7 @@ def _highlight_headings(text: str) -> str:
 # ── Formatting helpers ────────────────────────────────────────────────────────
 
 
-def _get_truncate_length() -> Optional[int]:
+def _get_truncate_length() -> int | None:
     """Get the global truncate length from Flask app config."""
     from flask import current_app
 
@@ -215,7 +215,7 @@ def _process_text(text, truncated: bool = False) -> str:
     return text
 
 
-def _truncate(text: str, length: Optional[int]) -> str:
+def _truncate(text: str, length: int | None) -> str:
     """Truncate text to specified length, adding ellipsis if needed."""
     if length and len(text) > length:
         return text[:length] + "...[Truncated]"
@@ -249,7 +249,7 @@ def _process_standardised_conversation(
     try:
         conversation = StandardisedConversation()
         conversation.add_conversation(conversation_data)
-    except (json.JSONDecodeError, Exception):
+    except (json.JSONDecodeError, Exception):  # noqa: BLE001
         return _html.escape(_process_text(str(conversation_data), truncated))
 
     def render_message(node, message) -> str:
@@ -309,15 +309,15 @@ def _extract_stats(rp: ResultProcessor) -> dict:
     asr = f"{rp.attack_success_rate:.1f}%"
     gtr = f"{(guard / total * 100):.1f}%" if total and guard else "0.0%"
 
-    return dict(
-        total=total,
-        successes=succ,
-        failures=fail,
-        guardrails=guard,
-        errors=err,
-        asr=asr,
-        gtr=gtr,
-    )
+    return {
+        "total": total,
+        "successes": succ,
+        "failures": fail,
+        "guardrails": guard,
+        "errors": err,
+        "asr": asr,
+        "gtr": gtr,
+    }
 
 
 def _extract_breakdowns(rp: ResultProcessor):
@@ -380,12 +380,12 @@ def _inject_helpers():
         sf = entry.get("source_file", "")
         return extract_resource_name(sf) if sf else ""
 
-    return dict(
-        process_text=_process_text,
-        process_standardised_conversation=_process_standardised_conversation,
-        text_to_colour=_text_to_colour,
-        source_label=_source_label,
-    )
+    return {
+        "process_text": _process_text,
+        "process_standardised_conversation": _process_standardised_conversation,
+        "text_to_colour": _text_to_colour,
+        "source_label": _source_label,
+    }
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -422,7 +422,7 @@ def overview() -> str:
             description=f"Result file '{selected}' not found. Use the selector to choose a valid file or refresh to rescan.",
         )
 
-    entries, processor_output, rp = _load_result_data(files)
+    _, processor_output, rp = _load_result_data(files)
     stats = _extract_stats(rp)
     breakdowns = _extract_breakdowns(rp)
 
@@ -541,7 +541,7 @@ def entry(entry_id: str) -> str:
     )
 
 
-def _find_entry_in_files(entry_id: str, selected: str) -> Tuple[Dict[str, Any], str]:
+def _find_entry_in_files(entry_id: str, selected: str) -> tuple[dict[str, Any], str]:
     """
     Locate a single entry by its composite key without running ResultProcessor.
     Reads raw JSONL rows only — used by mutation routes (toggle, rejudge, bulk).

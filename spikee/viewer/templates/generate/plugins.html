@@ -243,7 +243,6 @@ const runBtn     = document.getElementById('run-btn');
 const statusEl   = document.getElementById('run-status');
 const outputArea = document.getElementById('output-area');
 const countBadge = document.getElementById('output-count');
-const csrfToken  = document.querySelector('meta[name="csrf-token"]').content;
 
 runBtn.addEventListener('click', async () => {
     const pipeline        = pipelineVal.value.trim();
@@ -266,7 +265,6 @@ runBtn.addEventListener('click', async () => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken,
             },
             body: JSON.stringify({ pipeline, plugin_options, input_text, exclude_patterns }),
         });

@@ -33,16 +33,18 @@ Requirements:
     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu<version>
 """
 
-from spikee.utilities.modules import parse_options
-from spikee.utilities.enums import ModuleTag
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
-from spikee.templates.plugin import Plugin
-from transformers import MarianMTModel, MarianTokenizer
-import torch
 import logging
 import os
 import warnings
-from typing import List, Union, Optional
+from typing import ClassVar
+
+import torch
+from transformers import MarianMTModel, MarianTokenizer
+
+from spikee.templates.plugin import Plugin
+from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
+from spikee.utilities.modules import parse_options
 
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
@@ -56,7 +58,7 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 
 class OpusTranslator(Plugin):
     # Common language codes (not exhaustive—OPUS-MT supports 500+)
-    SUPPORTED_LANGUAGES = {
+    SUPPORTED_LANGUAGES: ClassVar[dict[str, str]] = {
         "ta": "Tamil",
         "te": "Telugu",
         "my": "Burmese",
@@ -141,8 +143,8 @@ class OpusTranslator(Plugin):
         self,
         src_lang: str,
         tgt_lang: str,
-        cache_dir: Optional[str] = None,
-        device: Optional[str] = None,
+        cache_dir: str | None = None,
+        device: str | None = None,
     ):
         """Load and cache translator model. Reuses cached models on subsequent calls.
 
@@ -170,9 +172,9 @@ class OpusTranslator(Plugin):
             # Store in cache for reuse
             self.model_cache[cache_key] = (tokenizer, model, target_device)
             return tokenizer, model, target_device
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise RuntimeError(
-                f"[OpusTranslator] Failed to load model '{model_name}': {str(e)}"
+                f"[OpusTranslator] Failed to load model '{model_name}': {e!s}"
             )
 
     def _translate(
@@ -180,9 +182,9 @@ class OpusTranslator(Plugin):
         text: str,
         src_lang: str,
         tgt_lang: str,
-        cache_dir: Optional[str] = None,
+        cache_dir: str | None = None,
         num_beams: int = 1,
-        device: Optional[str] = None,
+        device: str | None = None,
     ) -> str:
         """Translate text from src_lang to tgt_lang with optional beam search.
 
@@ -190,29 +192,26 @@ class OpusTranslator(Plugin):
             num_beams: Number of beams for beam search. 1 = greedy, >1 = beam search for better quality.
             device: Device to use ('cuda' or 'cpu'). Defaults to auto-detected.
         """
-        try:
-            tokenizer, model, target_device = self._load_translator(
-                src_lang, tgt_lang, cache_dir, device
-            )
-        except RuntimeError as e:
-            raise e
+        tokenizer, model, target_device = self._load_translator(
+            src_lang, tgt_lang, cache_dir, device
+        )
 
         try:
             inputs = tokenizer(text, return_tensors="pt").to(target_device)
             outputs = model.generate(**inputs, max_length=512, num_beams=num_beams)
             translated = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
             return translated
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             raise RuntimeError(
-                f"[OpusTranslator] Translation failed for {src_lang}→{tgt_lang}: {str(e)}"
+                f"[OpusTranslator] Translation failed for {src_lang}→{tgt_lang}: {e!s}"
             )
 
     def transform(
         self,
         content: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
-    ) -> Union[str, List[str]]:
+    ) -> str | list[str]:
         """
         Translates input text to target language(s).
 
@@ -243,6 +242,7 @@ class OpusTranslator(Plugin):
             target_specs = [t.strip() for t in targets_str.split("+")]
 
         translations = []
+        translation_errors = []
 
         for target_spec in target_specs:
             try:
@@ -264,12 +264,19 @@ class OpusTranslator(Plugin):
                     )
 
                 translations.append(result)
-            except RuntimeError:
+            except RuntimeError as error:
+                translation_errors.append(f"{target_spec}: {error}")
                 continue
 
         if len(translations) == 1:
             return translations[0]
-        return translations if translations else content
+        if translations:
+            return translations
+
+        raise RuntimeError(
+            "[OpusTranslator] All requested translations failed: "
+            + "; ".join(translation_errors)
+        )
 
 
 if __name__ == "__main__":

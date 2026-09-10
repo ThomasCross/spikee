@@ -302,7 +302,6 @@ const logFileRow     = document.getElementById('log-file-row');
 const logFileDisplay = document.getElementById('log-file-display');
 const logCountEl     = document.getElementById('log-count-display');
 const logErrorEl     = document.getElementById('log-error-display');
-const csrfToken      = document.querySelector('meta[name="csrf-token"]').content;
 
 sendBtn.addEventListener('click', async () => {
     const target           = document.getElementById('target').value;
@@ -334,7 +333,6 @@ sendBtn.addEventListener('click', async () => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken,
             },
             body: JSON.stringify({
                 target, target_options,
@@ -384,7 +382,7 @@ sendBtn.addEventListener('click', async () => {
 document.getElementById('new-log-btn').addEventListener('click', async () => {
     await fetch('/test/workshop/new-log', {
         method: 'POST',
-        headers: { 'X-CSRFToken': csrfToken },
+        headers: {},
     });
     logFileDisplay.textContent = '';
     logFileRow.classList.add('d-none');

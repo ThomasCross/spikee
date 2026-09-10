@@ -29,15 +29,13 @@ Plugin                   Total    Successes    Attempts  Success Rate
 'custom-llm-judge'          43            1          43  2.33%
 """
 
-from spikee.utilities.modules import parse_options, extract_json_or_fail
-from spikee.utilities.llm_message import HumanMessage
-from spikee.utilities.llm import get_llm
-from spikee.utilities.enums import ModuleTag
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.templates.plugin import Plugin
 from spikee.templates.provider import Provider
-from typing import List, Optional
-
+from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
+from spikee.utilities.llm import get_llm
+from spikee.utilities.llm_message import HumanMessage
+from spikee.utilities.modules import extract_json_or_fail, parse_options
 
 # ---------------------------------------------------------------------------
 # Supported digraphic languages and their writing systems
@@ -164,9 +162,11 @@ class DigraphicTranslate(Plugin):
     def get_description(self) -> ModuleDescriptionHint:
         return (
             [ModuleTag.TRANSLATION, ModuleTag.LLM],
-            "Generates jailbreak prompts by mixing writing systems within a single digraphic "
-            "language (e.g. Japanese Kanji/Romaji, Serbian Cyrillic/Latin) to evade "
-            "script-sensitive safety classifiers.",
+            (
+                "Generates jailbreak prompts by mixing writing systems within a single digraphic "
+                "language (e.g. Japanese Kanji/Romaji, Serbian Cyrillic/Latin) to evade "
+                "script-sensitive safety classifiers."
+            ),
         )
 
     def get_available_option_values(self) -> ModuleOptionsHint:
@@ -190,7 +190,7 @@ class DigraphicTranslate(Plugin):
     def transform(
         self,
         content: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
     ) -> str:
         opts = parse_options(plugin_option)
@@ -206,13 +206,13 @@ class DigraphicTranslate(Plugin):
         llm = get_llm(llm_model, max_tokens=2000)
 
         if not isinstance(llm, Provider):
-            raise ValueError("DigraphicTranslate plugin requires an LLM provider model")
+            raise TypeError("DigraphicTranslate plugin requires an LLM provider model")
 
         prompt_text = self._build_prompt(content, lang_key)
         response = llm.invoke([HumanMessage(prompt_text)]).content
 
         if not isinstance(response, str):
-            raise RuntimeError("LLM response is not a string as expected")
+            raise TypeError("LLM response is not a string as expected")
 
         obj = extract_json_or_fail(response)
         attack_prompt = obj.get("attack_prompt", "").strip()

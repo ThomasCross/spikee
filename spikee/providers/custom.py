@@ -1,11 +1,12 @@
 import os
+from typing import Any
+
 from any_llm import AnyLLM
-from typing import Union, Any, Dict
 
 from spikee.templates.provider import Provider
-from spikee.utilities.hinting import ModuleDescriptionHint
 from spikee.utilities.enums import ModuleTag
-from spikee.utilities.llm_message import format_messages, AIMessage, MessageHint
+from spikee.utilities.hinting import ModuleDescriptionHint
+from spikee.utilities.llm_message import AIMessage, MessageHint, format_messages
 
 
 class AnyLLMCustomProvider(Provider):
@@ -13,10 +14,10 @@ class AnyLLMCustomProvider(Provider):
 
     @property
     def default_model(self) -> str:
-        return list(self.models.keys())[0]  # Return the first model as the default
+        return next(iter(self.models.keys()))  # Return the first model as the default
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {"none": "none"}
 
     @property
@@ -24,18 +25,18 @@ class AnyLLMCustomProvider(Provider):
         return "Custom"
 
     @property
-    def base_url(self) -> Union[str, None]:
+    def base_url(self) -> str | None:
         return os.getenv("CUSTOM_API_URL", None)
 
     @property
-    def api_key(self) -> Union[str, None]:
+    def api_key(self) -> str | None:
         return os.getenv("CUSTOM_API_KEY", None)
 
     def setup(
         self,
         model: str,
-        max_tokens: Union[int, None] = None,
-        temperature: Union[float, None] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **kwargs,
     ):
         self.model = model
@@ -63,7 +64,7 @@ class AnyLLMCustomProvider(Provider):
                 f"[Import Error] Provider Module '{self.name}' is missing required packages for OpenAI compatible APIs. Please run `pip install spikee[openai]` to install them."
             )
 
-        options_kwargs: Dict[str, Any] = {}
+        options_kwargs: dict[str, Any] = {}
         if self.max_tokens is not None:
             options_kwargs["max_tokens"] = self.max_tokens
 
@@ -99,5 +100,3 @@ class AnyLLMCustomProvider(Provider):
 
     def response_validation(self, messages: MessageHint, response: AIMessage) -> None:
         """Abstract validation method for subclasses to implement specific response validation logic. Otherwise validations common OpenAI compatible API errors."""
-
-        pass

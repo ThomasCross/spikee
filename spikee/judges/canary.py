@@ -41,7 +41,7 @@ class CanaryJudge(Judge):
             return any(arg in llm_output for arg in judge_args)
 
         else:
-            raise ValueError("judge_args must be a string or list of strings.")
+            raise TypeError("judge_args must be a string or list of strings.")
 
 
 if __name__ == "__main__":

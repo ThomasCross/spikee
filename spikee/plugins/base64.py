@@ -14,11 +14,10 @@ Returns:
 """
 
 import base64
-from typing import List, Optional
 
 from spikee.templates.plugin import Plugin
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 
 
 class Base64(Plugin):
@@ -29,9 +28,7 @@ class Base64(Plugin):
         """Return supported attack options; Tuple[options (default is first), llm_required]"""
         return [], False
 
-    def transform(
-        self, content: str, exclude_patterns: Optional[List[str]] = None
-    ) -> str:
+    def transform(self, content: str, exclude_patterns: list[str] | None = None) -> str:
         """
         Transforms the input text into Base64 encoding.
 

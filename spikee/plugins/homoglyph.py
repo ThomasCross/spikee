@@ -40,7 +40,7 @@ Returns:
 """
 
 import random
-from typing import Dict
+from typing import ClassVar
 
 from spikee.templates.basic_plugin import BasicPlugin
 from spikee.utilities.enums import ModuleTag
@@ -54,7 +54,7 @@ class HomoglyphPlugin(BasicPlugin):
     # Latin -> visually-identical Cyrillic/Greek confusable.
     # Only high-confidence, single-character mappings are included; unmapped
     # characters are passed through unchanged.
-    CONFUSABLES: Dict[str, str] = {
+    CONFUSABLES: ClassVar[dict[str, str]] = {
         # lowercase
         "a": "а",  # CYRILLIC SMALL LETTER A
         "c": "с",  # CYRILLIC SMALL LETTER ES

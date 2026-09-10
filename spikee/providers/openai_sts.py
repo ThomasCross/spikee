@@ -10,16 +10,15 @@ Additional Args:
 import asyncio
 import base64
 import os
-from typing import Union, Dict, Optional, Set
 
 from spikee.templates.provider import Provider
-from spikee.utilities.hinting import ModuleDescriptionHint, Audio, get_content
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import Audio, ModuleDescriptionHint, get_content
 from spikee.utilities.llm_message import (
-    single_message,
     AIMessage,
     HumanMessage,
     MessageHint,
+    single_message,
 )
 
 
@@ -37,21 +36,21 @@ class OpenAISTSProvider(Provider):
         return "gpt-4o-realtime-preview"
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {
             "gpt-4o-realtime-preview": "gpt-4o-realtime-preview",
             "gpt-4o-mini-realtime-preview": "gpt-4o-mini-realtime-preview",
         }
 
     @property
-    def audio_formats(self) -> Set[str]:
+    def audio_formats(self) -> set[str]:
         return {"pcm"}
 
     def setup(
         self,
         model: str,
-        max_tokens: Union[int, None] = None,
-        temperature: Union[float, None] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **additional_kwargs,
     ) -> None:
         self.model = model
@@ -75,7 +74,7 @@ class OpenAISTSProvider(Provider):
         ], "STS Provider for OpenAI speech-to-speech models via the Realtime API."
 
     async def _invoke_async(
-        self, audio_b64: str, instructions: Optional[str] = None
+        self, audio_b64: str, instructions: str | None = None
     ) -> str:
         """Async call to the OpenAI Realtime API for speech-to-speech conversion."""
         session_config = {
@@ -108,10 +107,10 @@ class OpenAISTSProvider(Provider):
         content = msg.content
 
         if not isinstance(content, Audio):
-            raise ValueError("OpenAI STS Provider requires audio content as input.")
+            raise TypeError("OpenAI STS Provider requires audio content as input.")
 
         if system_msg is not None and not isinstance(system_msg.content, str):
-            raise ValueError(
+            raise TypeError(
                 "OpenAI STS Provider requires system instructions to be a text string."
             )
 
@@ -132,6 +131,7 @@ class OpenAISTSProvider(Provider):
 
 if __name__ == "__main__":
     import sys
+
     from dotenv import load_dotenv
 
     load_dotenv()
