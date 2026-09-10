@@ -41,11 +41,13 @@ jobs:
             *) echo "Invalid release_type. Use: major | minor | patch"; exit 1;;
           esac
 
-      - name: Merge develop into main (fast-forward only)
+      - name: Merge develop into release contents
         shell: bash
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin develop
-          git merge --ff-only origin/develop
+          git merge --no-ff --no-edit origin/develop
 
       - name: Set up Python
         uses: actions/setup-python@v5
