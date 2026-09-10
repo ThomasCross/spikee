@@ -1,20 +1,19 @@
 from dataclasses import dataclass
-from typing import List, Optional
 
+import rich.box
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 from rich.rule import Rule
-import rich.box
+from rich.table import Table
 
-from spikee.utilities.enums import ModuleTag, module_tag_to_colour, formatting_priority
+from spikee.utilities.enums import ModuleTag, formatting_priority, module_tag_to_colour
 from spikee.utilities.modules import (
-    load_module_from_path,
-    get_options_from_module,
-    get_description_from_module,
-    collect_seeds,
     collect_datasets,
     collect_modules,
+    collect_seeds,
+    get_description_from_module,
+    get_options_from_module,
+    load_module_from_path,
 )
 
 console = Console()
@@ -46,9 +45,9 @@ def list_datasets(args):
 @dataclass
 class Module:
     name: str
-    options: Optional[List[str]] = None
-    tags: Optional[List[ModuleTag]] = None
-    description: Optional[str] = ""
+    options: list[str] | None = None
+    tags: list[ModuleTag] | None = None
+    description: str | None = ""
 
 
 def _render_section(
@@ -89,7 +88,7 @@ def _render_section(
             else:
                 tags, description = [], ""
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             error = e if len(str(e)) < 70 else str(e)[:70] + "..."
             options = [f"<error - {error}>"]
             tags = []

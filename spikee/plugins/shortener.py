@@ -1,13 +1,15 @@
-from typing import List, Union, Optional
 import json
+import logging
 
 from spikee.templates.plugin import Plugin
 from spikee.templates.provider import Provider
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.llm import get_llm
 from spikee.utilities.llm_message import HumanMessage, SystemMessage
-from spikee.utilities.modules import parse_options, extract_json_or_fail
+from spikee.utilities.modules import extract_json_or_fail, parse_options
+
+logger = logging.getLogger(__name__)
 
 SHORTENER_PROMPT = """
 You are a cybersecurity system that shortens prompt injection attacks to a defined length. 
@@ -50,9 +52,9 @@ class Shortener(Plugin):
     def transform(
         self,
         content: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
-    ) -> Union[str, List[str]]:
+    ) -> str | list[str]:
 
         opts = parse_options(plugin_option)
         llm_model = opts.get("model", self.DEFAULT_MODEL)
@@ -62,7 +64,7 @@ class Shortener(Plugin):
         llm = get_llm(llm_model, temperature=1, max_tokens=max_length + 25)
 
         if not isinstance(llm, Provider):
-            raise ValueError(f"LLM model {llm_model} is not a valid provider.")
+            raise TypeError(f"LLM model {llm_model} is not a valid provider.")
 
         # Shorten the text iteratively until it's within the desired length or we run out of attempts
         length = len(content)
@@ -85,13 +87,14 @@ class Shortener(Plugin):
             ).content
 
             if not isinstance(response, str):
-                raise ValueError(
+                raise TypeError(
                     f"LLM response is not a string as expected, got {type(response)}."
                 )
             try:
                 response = extract_json_or_fail(response)
                 content = response.get("text")
-            except Exception:
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Shortener response parsing failed: %s", exc)
                 continue
 
             length = len(content)

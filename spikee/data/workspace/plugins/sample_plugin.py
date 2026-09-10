@@ -18,11 +18,10 @@ Usage within Spikee:
 This sample plugin simply transforms the input text to uppercase.
 """
 
-from typing import List, Union, Optional
 import re
 
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.templates.plugin import Plugin
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 
 
 class SamplePlugin(Plugin):
@@ -39,8 +38,8 @@ class SamplePlugin(Plugin):
     def transform(
         self,
         content: str,  # specify specific content types using Text, Audio, Image subclasses of Content
-        exclude_patterns: Optional[List[str]] = None,
-    ) -> Union[str, List[str]]:
+        exclude_patterns: list[str] | None = None,
+    ) -> str | list[str]:
         """
         Transforms the input text to uppercase, preserving any substrings that match the given exclusion patterns.
 

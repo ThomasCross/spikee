@@ -1,10 +1,12 @@
+import base64
 import binascii
 import inspect
-from typing import Dict, Optional, Union, List, Tuple, Callable, Any
-import typing
-import base64
 import io
+import typing
 import warnings
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any, Optional
 
 from spikee.utilities.enums import ModuleTag
 
@@ -18,9 +20,9 @@ class ParentContent:
 class Audio(ParentContent):
     """Stored audio content as a Base64-encoded string. The format can be optionally specified for better handling downstream."""
 
-    def __init__(self, content: str, audio_format: Optional[str] = None):
+    def __init__(self, content: str, audio_format: str | None = None):
         if not isinstance(content, str):
-            raise ValueError(
+            raise TypeError(
                 f"Audio content must be a base64-encoded string, got {type(content)}"
             )
 
@@ -28,7 +30,7 @@ class Audio(ParentContent):
 
         self.format = audio_format
 
-    def detect_audio_format(self) -> Optional[str]:
+    def detect_audio_format(self) -> str | None:
         """Detect the audio format from the base64-encoded content using magic bytes.
 
         Returns a lowercase format string (e.g. 'mp3', 'wav', 'flac') or 'pcm' if the format cannot be determined.
@@ -150,7 +152,7 @@ class Audio(ParentContent):
         """Get the raw audio bytes by decoding the base64 content."""
         return base64.b64decode(self.content)
 
-    def set_raw_audio(self, audio_bytes: bytes, audio_format: Optional[str] = None):
+    def set_raw_audio(self, audio_bytes: bytes, audio_format: str | None = None):
         """Set the audio content from raw audio bytes, encoding it as base64."""
         self.content = base64.b64encode(audio_bytes).decode("utf-8")
         if audio_format:
@@ -160,7 +162,7 @@ class Audio(ParentContent):
 class Image(ParentContent):
     def __init__(self, content: str):
         if not isinstance(content, str):
-            raise ValueError(
+            raise TypeError(
                 f"Image content must be a base64-encoded string, got {type(content)}"
             )
 
@@ -171,7 +173,7 @@ class Image(ParentContent):
         return f"data:image/png;base64,{self.content}"
 
 
-Content = Union[str, Audio, Image]
+Content = str | Audio | Image
 
 
 def content_factory(content, content_type: str = "text") -> Content:
@@ -195,7 +197,7 @@ def get_content(content: Content) -> str:
     elif isinstance(content, str):
         return content
     else:
-        raise ValueError(f"Unsupported content type: {type(content)}")
+        raise TypeError(f"Unsupported content type: {type(content)}")
 
 
 def get_content_type(content: Content) -> str:
@@ -251,11 +253,29 @@ def validate_content_annotation(content: Content, annotation) -> bool:
 # endregion
 
 
-ModuleDescriptionHint = Tuple[List[ModuleTag], str]
-ModuleOptionsHint = Tuple[List[str], bool]
+ModuleDescriptionHint = tuple[list[ModuleTag], str]
+ModuleOptionsHint = tuple[list[str], bool]
 
-TargetResponseHint = Union[Content, bool, Tuple[Union[Content, bool], Any]]
-AttackResponseHint = Tuple[int, bool, Union[Content, Dict[str, Any]], Content]
+TargetResponseHint = Content | bool | tuple[Content | bool, Any]
+
+
+@dataclass
+class AttackAttempt:
+    """One retained result. Attempts is an additive count, never an ordinal."""
+
+    input: Any
+    response: Any
+    success: bool | None
+    attempts: int = 1
+    error: str | None = None
+    response_time: float | None = None
+    guardrail: bool = False
+    guardrail_categories: dict | None = None
+
+
+AttackResponseHint = (
+    tuple[int, bool, Content | dict[str, Any], Content] | list[AttackAttempt]
+)
 
 
 def process_target_content(response: TargetResponseHint) -> str:
@@ -273,6 +293,6 @@ def process_target_content(response: TargetResponseHint) -> str:
         return get_content(response)
 
     else:
-        raise ValueError(
+        raise TypeError(
             f"Unexpected return type from target's process_input: {type(response)}. Expected Content."
         )

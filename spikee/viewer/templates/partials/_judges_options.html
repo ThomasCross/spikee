@@ -1,0 +1,19 @@
+{# partials/_judges_options.html
+   <option> elements for the judge <select>.
+   Expects: judges — {local: [{name, tags}], builtin: [...]}
+#}
+<option value="">— none (record response only) —</option>
+{% if judges.local %}
+<optgroup label="Local">
+    {% for j in judges.local %}
+    <option value="{{ j.name }}">{{ j.name }}{% if j.tags %} ({% for tag in j.tags %}{{ tag.label }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}</option>
+    {% endfor %}
+</optgroup>
+{% endif %}
+{% if judges.builtin %}
+<optgroup label="Built-in">
+    {% for j in judges.builtin %}
+    <option value="{{ j.name }}">{{ j.name }}{% if j.tags %} ({% for tag in j.tags %}{{ tag.label }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}</option>
+    {% endfor %}
+</optgroup>
+{% endif %}

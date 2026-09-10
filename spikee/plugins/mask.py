@@ -18,18 +18,17 @@ Options:
 
 """
 
-from typing import List, Optional, Union
 import json
 import random
 import string
 
 from spikee.templates.plugin import Plugin
 from spikee.templates.provider import Provider
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.llm import get_llm
 from spikee.utilities.llm_message import HumanMessage, SystemMessage
-from spikee.utilities.modules import parse_options, extract_json_or_fail
+from spikee.utilities.modules import extract_json_or_fail, parse_options
 
 MASK_PROMPT = """
 You are a cybersecurity system that identifies high-risk words within a prompt. You will be provided with
@@ -68,9 +67,9 @@ class Shortener(Plugin):
     def transform(
         self,
         content: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
-    ) -> Union[str, List[str]]:
+    ) -> str | list[str]:
 
         opts = parse_options(plugin_option)
         llm_model = opts.get("model", self.DEFAULT_MODEL)
@@ -80,7 +79,7 @@ class Shortener(Plugin):
         llm = get_llm(llm_model, temperature=1, max_tokens=1000)
 
         if not isinstance(llm, Provider):
-            raise RuntimeError("[Mask] LLM provider is required for this plugin.")
+            raise TypeError("[Mask] LLM provider is required for this plugin.")
 
         # Detect high-risk words
         payload = {"prompt": content}
@@ -93,7 +92,7 @@ class Shortener(Plugin):
         ).content
 
         if not isinstance(response, str):
-            raise RuntimeError("[Mask] LLM response is not a string.")
+            raise TypeError("[Mask] LLM response is not a string.")
 
         risk_words = {}
         suffix = ""
@@ -133,7 +132,7 @@ class Shortener(Plugin):
                         f" (Detected risk word '{word}' not found in original text.)"
                     )
 
-        except Exception:
+        except Exception:  # noqa: BLE001
             raise RuntimeError("[Mask] Failed to extract risk words from LLM response.")
 
         return content + " " + suffix.strip()

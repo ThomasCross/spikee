@@ -1,24 +1,23 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Any
+from typing import Any
 
-from .multi_target import MultiTarget
 from spikee.utilities.enums import Turn
 from spikee.utilities.hinting import Content, TargetResponseHint
+
+from .multi_target import MultiTarget
 
 
 class SimpleMultiTarget(MultiTarget, ABC):
     __SIMPLIFIED_CONVERSATION_KEY = "conversation_data"
     __SIMPLIFIED_ID_MAP_KEY = "id_map"
 
-    def __init__(
-        self, turn_types: Optional[List[Turn]] = None, backtrack: bool = False
-    ):
+    def __init__(self, turn_types: list[Turn] | None = None, backtrack: bool = False):
         """Define target capabilities and initialize shared dictionary for multi-turn data."""
         if turn_types is None:
             turn_types = [Turn.MULTI]
         super().__init__(turn_types=turn_types, backtrack=backtrack)
 
-    def add_managed_dicts(self, target_data, add_dicts: Optional[List[str]] = None):
+    def add_managed_dicts(self, target_data, add_dicts: list[str] | None = None):
         """Adds managed dictionaries for multi-turn session data.
 
         Args:
@@ -119,10 +118,10 @@ class SimpleMultiTarget(MultiTarget, ABC):
     def process_input(
         self,
         input_text: Content,
-        system_message: Optional[Content] = None,
-        target_options: Optional[str] = None,
-        spikee_session_id: Optional[str] = None,
-        backtrack: Optional[bool] = False,
+        system_message: Content | None = None,
+        target_options: str | None = None,
+        spikee_session_id: str | None = None,
+        backtrack: bool | None = False,
     ) -> TargetResponseHint:
         """Sends prompts to the defined target
 
@@ -138,4 +137,3 @@ class SimpleMultiTarget(MultiTarget, ABC):
             throws tester.GuardrailTrigger: Indicates guardrail was triggered
             throws Exception: Raises exception on failure
         """
-        pass

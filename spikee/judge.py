@@ -1,7 +1,7 @@
 import inspect
 
-from .utilities.modules import load_module_from_path, get_default_option
 from .utilities.hinting import Content, validate_content_signature
+from .utilities.modules import get_default_option, load_module_from_path
 
 
 def annotate_judge_options(entries, judge_opts):

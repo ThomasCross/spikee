@@ -1,14 +1,15 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
 
-from spikee.utilities.enums import Turn
 from spikee.templates.module import Module
+from spikee.utilities.enums import Turn
 from spikee.utilities.hinting import Content, TargetResponseHint
 
 
 class Target(Module, ABC):
-    def __init__(self, turn_types: List[Turn] = [Turn.SINGLE], backtrack: bool = False):
+    def __init__(self, turn_types: list[Turn] | None = None, backtrack: bool = False):
         super().__init__()
+
+        turn_types = [Turn.SINGLE] if turn_types is None else turn_types
 
         self.config = {
             "single-turn": Turn.SINGLE in turn_types,
@@ -20,8 +21,8 @@ class Target(Module, ABC):
     def process_input(
         self,
         input_text: Content,
-        system_message: Optional[Content] = None,
-        target_options: Optional[str] = None,
+        system_message: Content | None = None,
+        target_options: str | None = None,
     ) -> TargetResponseHint:
         """Sends prompts to the defined target
 

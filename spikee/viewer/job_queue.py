@@ -11,7 +11,6 @@ persisted to a SQLite database (stdlib sqlite3, no extra dependencies).
 
 from __future__ import annotations
 
-import html
 import json
 import os
 import shutil
@@ -19,13 +18,10 @@ import sqlite3
 import subprocess
 import sys
 import threading
-import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Generator, Optional
-
 
 _CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -44,22 +40,22 @@ CREATE TABLE IF NOT EXISTS jobs (
 @dataclass
 class Job:
     id: str
-    type: str  # "generate" | "test"
+    type: str  # "generate" | "test" | "manual" | "script"
     name: str  # human-readable label
     status: str  # "running" | "success" | "failed"
     created_at: datetime
-    args: list  # CLI args list (after "spikee --quiet")
+    args: object  # CLI args list OR dict for manual jobs
     log: list = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
-    returncode: Optional[int] = None
-    process: Optional[object] = None  # subprocess.Popen
+    returncode: int | None = None
+    process: object | None = None  # subprocess.Popen
 
 
 class JobQueue:
-    def __init__(self, db_path: Optional[str] = None) -> None:
+    def __init__(self, db_path: str | None = None) -> None:
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
-        self._db_path: Optional[str] = db_path
+        self._db_path: str | None = db_path
 
         if db_path is not None:
             # Ensure parent directories exist
@@ -127,15 +123,16 @@ class JobQueue:
             conn.commit()
 
     def _db_update(self, job: Job) -> None:
-        """Update status, log and returncode for an existing job row."""
+        """Update status, log, returncode and args for an existing job row."""
         with job.lock:
             status = job.status
             log_text = "\n".join(job.log)
             returncode = job.returncode
+            args_json = json.dumps(job.args)
         with self._connect() as conn:
             conn.execute(
-                "UPDATE jobs SET status=?, log=?, returncode=? WHERE id=?",
-                (status, log_text, returncode, job.id),
+                "UPDATE jobs SET status=?, log=?, returncode=?, args=? WHERE id=?",
+                (status, log_text, returncode, args_json, job.id),
             )
             conn.commit()
 
@@ -148,7 +145,7 @@ class JobQueue:
             type=type,
             name=name,
             status="running",
-            created_at=datetime.now(),
+            created_at=datetime.now(UTC),
             args=args,
         )
         with self._lock:
@@ -157,7 +154,7 @@ class JobQueue:
             self._db_insert(job)
         return job
 
-    def get(self, job_id: str) -> Optional[Job]:
+    def get(self, job_id: str) -> Job | None:
         """Return the job with the given ID, or None if not found."""
         return self._jobs.get(job_id)
 
@@ -171,8 +168,30 @@ class JobQueue:
         with self._lock:
             return any(j.status == "running" for j in self._jobs.values())
 
+    def update_job_args(self, job_id: str, args: object) -> None:
+        """Update a job's args in memory and persist to DB (used by manual jobs)."""
+        job = self.get(job_id)
+        if job is None:
+            return
+        with job.lock:
+            job.args = args
+        if self._db_path is not None:
+            self._db_update(job)
 
-def init_job_queue(db_path: Optional[str] = None) -> None:
+    def finish_job(self, job_id: str) -> None:
+        """Mark a manual job as complete."""
+        job = self.get(job_id)
+        if job is None:
+            return
+        with job.lock:
+            job.status = "success"
+            job.returncode = 0
+            job.log.append("[Manual] Session complete.")
+        if self._db_path is not None:
+            self._db_update(job)
+
+
+def init_job_queue(db_path: str | None = None) -> None:
     """
     Initialise the module-level job_queue singleton with the given db_path.
     Mutates the existing instance in-place so that blueprints that have already
@@ -215,16 +234,21 @@ def spawn_job(job: Job) -> None:
     Sets job.status to "success" or "failed" when the process exits.
     """
     try:
-        spikee_exe = _find_spikee_exe()
+        if job.type == "script":
+            command = list(job.args)
+        else:
+            spikee_exe = _find_spikee_exe()
+            command = [spikee_exe, "--quiet"] + job.args
         proc = subprocess.Popen(
-            [spikee_exe, "--quiet"] + job.args,
+            command,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=False,  # binary — we decode manually to handle \r correctly
+            shell=False,
             cwd=os.getcwd(),
         )
         job.process = proc
-    except Exception as e:
+    except OSError as e:
         with job.lock:
             job.log.append(f"[Error] Failed to start subprocess: {e}")
             job.status = "failed"
@@ -272,7 +296,7 @@ def spawn_job(job: Job) -> None:
             if buf:
                 with job.lock:
                     job.log.append(buf)
-        except Exception as e:
+        except OSError as e:
             with job.lock:
                 job.log.append(f"[Error] Log reader error: {e}")
         finally:
@@ -285,29 +309,6 @@ def spawn_job(job: Job) -> None:
 
     t = threading.Thread(target=_reader, daemon=True)
     t.start()
-
-
-def sse_stream(job: Job) -> Generator[str, None, None]:
-    """
-    Generator that yields SSE-formatted log lines for the given job.
-    Sends `event: done` when the job exits.
-    Used by the Jobs blueprint's /stream endpoint.
-    """
-    last = 0
-    while True:
-        with job.lock:
-            lines = list(job.log[last:])
-
-        for line in lines:
-            yield f"data: {html.escape(line)}\n\n"
-
-        last += len(lines)
-
-        if job.status != "running" and last >= len(job.log):
-            yield "event: done\ndata:\n\n"
-            return
-
-        time.sleep(0.2)
 
 
 # Module-level singleton — blueprints import this name directly.

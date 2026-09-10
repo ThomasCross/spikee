@@ -1,19 +1,21 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
+from typing import Any
 
-from .target import Target
 from spikee.utilities.enums import Turn
 from spikee.utilities.hinting import Content, TargetResponseHint
 
+from .target import Target
+
 
 class MultiTarget(Target, ABC):
-    def __init__(self, turn_types: List[Turn] = [Turn.MULTI], backtrack: bool = False):
+    def __init__(self, turn_types: list[Turn] | None = None, backtrack: bool = False):
         """Define target capabilities and initialize shared dictionary for multi-turn data."""
+        turn_types = [Turn.MULTI] if turn_types is None else turn_types
         super().__init__(turn_types=turn_types, backtrack=backtrack)
 
-        self.__target_data: Dict[Any, Any] = {}
+        self.__target_data: dict[Any, Any] = {}
 
-    def add_managed_dicts(self, target_data, add_dicts: List[str] = []):
+    def add_managed_dicts(self, target_data, add_dicts: list[str] | None = None):
         """Adds managed dictionaries for multi-turn session data.
 
         Args:
@@ -21,6 +23,7 @@ class MultiTarget(Target, ABC):
             add_dicts (List[str], optional): List of dictionary keys to add. Defaults to {}.
         """
         self.__target_data = target_data
+        add_dicts = [] if add_dicts is None else add_dicts
 
         for dict_key in add_dicts:
             self.__target_data[dict_key] = {}
@@ -49,10 +52,10 @@ class MultiTarget(Target, ABC):
     def process_input(
         self,
         input_text: Content,
-        system_message: Optional[Content] = None,
-        target_options: Optional[str] = None,
-        spikee_session_id: Optional[str] = None,
-        backtrack: Optional[bool] = False,
+        system_message: Content | None = None,
+        target_options: str | None = None,
+        spikee_session_id: str | None = None,
+        backtrack: bool | None = False,
     ) -> TargetResponseHint:
         """Sends prompts to the defined target
 

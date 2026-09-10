@@ -18,8 +18,8 @@ Returns:
 """
 
 from spikee.templates.basic_plugin import BasicPlugin
-from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 from spikee.utilities.enums import ModuleTag
+from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 
 
 class HexPlugin(BasicPlugin):
