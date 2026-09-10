@@ -41,13 +41,15 @@ jobs:
             *) echo "Invalid release_type. Use: major | minor | patch"; exit 1;;
           esac
 
-      - name: Merge develop into release contents
+      - name: Verify and fast-forward develop into release contents
         shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin develop
-          git merge --no-ff --no-edit origin/develop
+          if ! git merge-base --is-ancestor HEAD origin/develop; then
+            echo "ERROR: main and develop have diverged. Resolve the branch conflict in a reviewed synchronization PR before preparing a release."
+            exit 1
+          fi
+          git merge --ff-only origin/develop
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -233,6 +235,8 @@ jobs:
 
       - name: Create release pull request
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ steps.bump.outputs.new_version }}"
           RELEASE_BRANCH="release/v${VERSION}"
