@@ -21,19 +21,18 @@ import base64
 import os
 
 from spikee.templates.provider import Provider
+from spikee.utilities.enums import ModuleTag
 from spikee.utilities.hinting import (
+    Audio,
     ModuleDescriptionHint,
     ModuleOptionsHint,
-    Audio,
 )
-from spikee.utilities.enums import ModuleTag
 from spikee.utilities.llm_message import (
-    single_message,
     AIMessage,
     HumanMessage,
     MessageHint,
+    single_message,
 )
-from typing import Set, Union, Dict
 
 
 class AWSPollyTTSProvider(Provider):
@@ -51,7 +50,7 @@ class AWSPollyTTSProvider(Provider):
         return "neural"
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {
             "neural": "neural",  # Neural TTS — natural, high-quality voices (default)
             "generative": "generative",  # Generative TTS — most expressive
@@ -60,14 +59,14 @@ class AWSPollyTTSProvider(Provider):
         }
 
     @property
-    def audio_formats(self) -> Set[str]:
+    def audio_formats(self) -> set[str]:
         return {"mp3", "ogg_vorbis", "pcm"}
 
     def setup(
         self,
         model: str,
-        max_tokens: Union[int, None] = None,
-        temperature: Union[float, None] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **additional_kwargs,
     ) -> None:
         self.engine = model
@@ -156,6 +155,7 @@ class AWSPollyTTSProvider(Provider):
 
 if __name__ == "__main__":
     import sys
+
     from dotenv import load_dotenv
 
     load_dotenv()

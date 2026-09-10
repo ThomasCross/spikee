@@ -1,13 +1,13 @@
-from spikee.providers.custom import AnyLLMCustomProvider
-from typing import Union, Dict
 import os
+
+from spikee.providers.custom import AnyLLMCustomProvider
 
 
 class AnyLLMDeepSeekProvider(AnyLLMCustomProvider):
     """AnyLLM provider for DeepSeek models (via Custom provider with OpenAI compatibility)"""
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {
             "deepseek-chat": "deepseek-chat",  # deepseek-v3.2 non-thinking
             "deepseek-reasoner": "deepseek-reasoner",  # deepseek-v3.2 thinking
@@ -22,5 +22,5 @@ class AnyLLMDeepSeekProvider(AnyLLMCustomProvider):
         return "https://api.deepseek.com/v1"
 
     @property
-    def api_key(self) -> Union[str, None]:
+    def api_key(self) -> str | None:
         return os.getenv("DEEPSEEK_API_KEY", None)

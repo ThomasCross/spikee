@@ -11,34 +11,33 @@
     </div>
 
     {% if datasets %}
-    <div class="card spikee-card">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light border-bottom">
-                    <tr>
-                        <th class="ps-3 text-muted small fw-semibold">Filename</th>
-                        <th class="text-muted small fw-semibold" style="width:110px">Entries</th>
-                        <th style="width:80px"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for ds in datasets %}
-                    <tr>
-                        <td class="ps-3 small font-monospace text-break">
-                            <a href="/generate/datasets/{{ ds.name }}" class="text-decoration-none">{{ ds.name }}</a>
-                        </td>
-                        <td class="small fw-semibold">{{ ds.entry_count | default('—') }}</td>
-                        <td class="text-end pe-3">
+    <div class="row g-3">
+        {% for ds in datasets %}
+        <div class="col-12 col-md-6 col-xl-4">
+            <div class="card spikee-card h-100" data-name="{{ ds.name }}">
+                <div class="card-body d-flex align-items-start gap-3 py-3 px-3">
+                    <div class="flex-shrink-0 mt-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                             fill="var(--spikee-accent)" class="bi bi-file-earmark-text" viewBox="0 0 16 16">
+                            <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zm0 4a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zm0-8a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5z"/>
+                            <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-grow-1 min-width-0">
+                        <div class="fw-semibold small font-monospace text-break">{{ ds.name }}</div>
+                        <div class="text-muted" style="font-size:0.75rem">{{ ds.entry_count | default('—') }} entries</div>
+                        <div class="mt-2 d-flex align-items-center gap-2">
                             <a href="/generate/datasets/{{ ds.name }}"
-                               class="btn btn-xs btn-outline-secondary me-1">View</a>
+                               class="btn btn-xs btn-outline-secondary">View contents</a>
                             <a href="/test/run?dataset={{ ds.name }}"
-                               class="btn btn-xs btn-outline-spikee">Test &rarr;</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                               class="btn btn-xs btn-spikee">Test &rarr;</a>
+                            <input type="checkbox" class="form-check-input dataset-checkbox" data-name="{{ ds.name }}" style="margin-left:auto">
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+        {% endfor %}
     </div>
     {% else %}
     <div class="text-center text-muted py-5">
@@ -48,5 +47,101 @@
     </div>
     {% endif %}
 
+    <!-- Bulk action footer -->
+    <div id="bulk-toolbar" class="d-flex align-items-center gap-2 py-3" style="border-top:1px solid var(--bs-border-color); margin-top:1rem">
+        <span id="selection-count" class="fw-semibold small text-muted">0 selected</span>
+        <div class="vr"></div>
+        <button id="bulk-clone-btn" class="btn btn-sm btn-outline-primary">Clone</button>
+        <button id="bulk-rename-btn" class="btn btn-sm btn-outline-warning">Rename</button>
+        <button id="bulk-delete-btn" class="btn btn-sm btn-outline-danger">Delete</button>
+    </div>
+
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    try {
+        var checkboxes = Array.from(document.querySelectorAll('.dataset-checkbox'));
+        var selectionCount = document.getElementById('selection-count');
+        var bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+        var bulkCloneBtn = document.getElementById('bulk-clone-btn');
+        var bulkRenameBtn = document.getElementById('bulk-rename-btn');
+        console.log('[datasets] init ok', { checkboxes: checkboxes.length, hasToolbar: !!bulkCloneBtn });
+
+        function updateToolbar() {
+            var selected = checkboxes.filter(function (cb) { return cb.checked; });
+            selectionCount.textContent = selected.length + ' selected';
+        }
+
+    checkboxes.forEach(function (cb) {
+        cb.addEventListener('change', updateToolbar);
+    });
+
+    // Bulk clone
+    bulkCloneBtn.addEventListener('click', function () {
+        var selected = checkboxes.filter(function (cb) { return cb.checked; });
+        if (!selected.length) { alert('No datasets selected.'); return; }
+        var names = selected.map(function (cb) { return cb.getAttribute('data-name'); });
+        var lastUrl = null;
+        spikee.eachSequential(names, function (name) {
+            var suggestion = name.replace(/\.jsonl$/i, '') + '-copy.jsonl';
+            return spikee.promptModal('Clone "' + name + '" as:', suggestion).then(function (newName) {
+                if (newName === null || !String(newName).trim()) return;
+                return spikee.fetchJson('/generate/datasets/' + encodeURIComponent(name) + '/clone', {
+                    method: 'POST',
+                    body: JSON.stringify({ new_name: newName.trim() })
+                }).then(function (data) {
+                    if (data && data.url) lastUrl = data.url;
+                }).catch(function (err) {
+                    alert('Clone failed for "' + name + '": ' + err.message);
+                });
+            });
+        }).then(function () {
+            if (lastUrl) window.location.href = lastUrl;
+        });
+    });
+
+    // Bulk rename
+    bulkRenameBtn.addEventListener('click', function () {
+        var selected = checkboxes.filter(function (cb) { return cb.checked; });
+        if (!selected.length) { alert('No datasets selected.'); return; }
+        var names = selected.map(function (cb) { return cb.getAttribute('data-name'); });
+        spikee.eachSequential(names, function (name) {
+            return spikee.promptModal('Rename "' + name + '" to:', name).then(function (newName) {
+                if (newName === null || !String(newName).trim()) return;
+                newName = newName.trim();
+                return spikee.fetchJson('/generate/datasets/' + encodeURIComponent(name) + '/rename', {
+                    method: 'POST',
+                    body: JSON.stringify({ new_name: newName })
+                }).then(function () {
+                    spikee.updateCardName(name, newName);
+                }).catch(function (err) {
+                    alert('Rename failed for "' + name + '": ' + err.message);
+                });
+            });
+        });
+    });
+
+    // Bulk delete
+    bulkDeleteBtn.addEventListener('click', function () {
+        var selected = checkboxes.filter(function (cb) { return cb.checked; });
+        if (!selected.length) { alert('No datasets selected.'); return; }
+        if (!confirm('Delete ' + selected.length + ' dataset(s)?')) return;
+        var names = selected.map(function (cb) { return cb.getAttribute('data-name'); });
+        spikee.eachSequential(names, function (name) {
+            return spikee.fetchJson('/generate/datasets/' + encodeURIComponent(name), { method: 'DELETE' })
+                .then(function () { spikee.removeCard(name); })
+                .catch(function (err) { alert('Delete failed for "' + name + '": ' + err.message); });
+        }).then(updateToolbar);
+    });
+
+    console.log('[datasets] handlers attached');
+    } catch (e) {
+        console.error('[datasets] init error', e);
+        alert('datasets init error: ' + e.message);
+    }
+})();
+</script>
 {% endblock %}

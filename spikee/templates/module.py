@@ -1,4 +1,5 @@
 from abc import ABC
+
 from spikee.utilities.hinting import ModuleDescriptionHint, ModuleOptionsHint
 
 

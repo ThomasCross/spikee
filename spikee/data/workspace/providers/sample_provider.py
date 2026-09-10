@@ -1,11 +1,11 @@
-from typing import Dict, Union, Any
+from typing import Any
+
+from agent_framework.openai import OpenAIChatClient, OpenAIChatOptions
 
 from spikee.templates.provider import Provider
 from spikee.utilities.enums import ModuleTag
-from spikee.utilities.llm_message import AIMessage, MessageHint
 from spikee.utilities.hinting import ModuleDescriptionHint
-
-from agent_framework.openai import OpenAIChatClient, OpenAIChatOptions
+from spikee.utilities.llm_message import AIMessage, MessageHint
 
 BASE_URL = "https://example.com/openai/v1"
 
@@ -18,14 +18,14 @@ class AnyLLMSampleProvider(Provider):
         return "example1"
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {"example1": "example1"}
 
     def setup(
         self,
         model: str,
-        max_tokens: Union[int, None] = None,
-        temperature: Union[float, None] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
     ):
         self.model = model
         self.max_tokens = max_tokens
@@ -38,7 +38,7 @@ class AnyLLMSampleProvider(Provider):
             model_id=self.model, base_url=BASE_URL, api_key="example API key"
         )
 
-        options_kwargs: Dict[str, Any] = {}
+        options_kwargs: dict[str, Any] = {}
         if self.max_tokens is not None:
             options_kwargs["max_completion_tokens"] = self.max_tokens
 

@@ -4,8 +4,7 @@
 from __future__ import annotations
 
 from spikee.utilities.modules import load_module_from_path
-
-from spikee.viewer.blueprints._tags import _get_tag_label, _get_tag_colour
+from spikee.viewer.blueprints._tags import _get_tag_colour, _get_tag_label
 
 
 def module_tags(name: str, module_type: str) -> list[dict]:
@@ -41,6 +40,6 @@ def _compute_tags_live(name: str, module_type: str) -> list[dict]:
                 {"label": _get_tag_label(tag), "colour": _get_tag_colour(tag)}
                 for tag in sorted_tags
             ]
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return []

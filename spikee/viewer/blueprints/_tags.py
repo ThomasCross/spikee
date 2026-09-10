@@ -48,6 +48,6 @@ def _compute_tags(name: str, module_type: str) -> list[dict]:
                 {"label": _get_tag_label(tag), "colour": _get_tag_colour(tag)}
                 for tag in sorted_tags
             ]
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return []

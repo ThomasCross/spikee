@@ -1,13 +1,13 @@
-from spikee.providers.custom import AnyLLMCustomProvider
-from typing import Union, Dict
 import os
+
+from spikee.providers.custom import AnyLLMCustomProvider
 
 
 class AnyLLMTogetherAIProvider(AnyLLMCustomProvider):
     """AnyLLM provider for TogetherAI models (via Custom provider with OpenAI compatibility)"""
 
     @property
-    def models(self) -> Dict[str, str]:
+    def models(self) -> dict[str, str]:
         return {
             "gemma2-8b": "google/gemma-2-9b-it",
             "gemma2-27b": "google/gemma-2-27b-it",
@@ -31,5 +31,5 @@ class AnyLLMTogetherAIProvider(AnyLLMCustomProvider):
         return "https://api.together.ai/v1"
 
     @property
-    def api_key(self) -> Union[str, None]:
+    def api_key(self) -> str | None:
         return os.getenv("TOGETHER_API_KEY")

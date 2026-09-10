@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Union, overload, Optional
+from typing import overload
 
 from spikee.templates.module import Module
 from spikee.utilities.hinting import Content
@@ -11,9 +11,9 @@ class Plugin(Module, ABC):
     def transform(
         self,
         content: Content,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
-    ) -> Union[Content, List[Content]]:
+    ) -> Content | list[Content]:
         pass
 
     @abstractmethod
@@ -21,7 +21,7 @@ class Plugin(Module, ABC):
     def transform(
         self,
         text: str,
-        exclude_patterns: Optional[List[str]] = None,
+        exclude_patterns: list[str] | None = None,
         plugin_option: str = "",
-    ) -> Union[str, List[str]]:
+    ) -> str | list[str]:
         pass

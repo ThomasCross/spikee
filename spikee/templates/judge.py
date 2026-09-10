@@ -1,6 +1,6 @@
-from abc import ABC, abstractmethod
 import random
 import string
+from abc import ABC, abstractmethod
 
 from spikee.templates.module import Module
 from spikee.utilities.hinting import Content

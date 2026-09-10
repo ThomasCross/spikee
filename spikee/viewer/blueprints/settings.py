@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from flask import Blueprint, Response, current_app, jsonify, render_template, request
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+    session,
+)
 
 settings_bp = Blueprint("settings", __name__)
 
@@ -25,6 +33,20 @@ def refresh_modules() -> Response:
     ).start()
 
     return jsonify({"status": "refreshing"})
+
+
+@settings_bp.route("/api/reset-form", methods=["POST"])
+def reset_form() -> Response:
+    """Clear saved form settings for 'generate' or 'test' from the session."""
+    data = request.get_json(silent=True) or {}
+    form_name = data.get("form", "")
+    if form_name == "generate":
+        session.pop("generate_settings", None)
+    elif form_name == "test":
+        session.pop("test_settings", None)
+    else:
+        return jsonify({"error": "unknown form"}), 400
+    return jsonify({"status": "ok"})
 
 
 @settings_bp.route("/api/truncate", methods=["POST"])

@@ -1,12 +1,13 @@
-from abc import ABC, abstractmethod
-from typing import Any, List, Union, Callable
-import os
 import asyncio
 import gc
+import os
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from typing import Any
 
 from spikee.templates.module import Module
-from spikee.utilities.llm_message import Message, AIMessage, MessageHint
 from spikee.utilities.hinting import ModuleOptionsHint, get_content
+from spikee.utilities.llm_message import AIMessage, Message, MessageHint
 
 
 class ProviderError(Exception):
@@ -16,18 +17,18 @@ class ProviderError(Exception):
         self,
         message,
         prompt: MessageHint = "",
-        response: Union[AIMessage, None] = None,
-        metadata: dict = {},
+        response: AIMessage | None = None,
+        metadata: dict | None = None,
     ):
         super().__init__(message)
         self.prompt = prompt
         self.response = response
-        self.metadata = metadata
+        self.metadata = {} if metadata is None else metadata
 
 
 class Provider(Module, ABC):
     @property
-    def default_timeout(self) -> Union[float, None]:
+    def default_timeout(self) -> float | None:
         """Global fallback for provider timeouts, reads from SPIKEE_API_TIMEOUT."""
         val = os.getenv("SPIKEE_API_TIMEOUT")
         if val:
@@ -38,17 +39,17 @@ class Provider(Module, ABC):
         return None
 
     @property
-    def default_model(self) -> Union[str, None]:
+    def default_model(self) -> str | None:
         """Override in subclass to specify a default model key."""
         return None
 
     @property
-    def models(self) -> Union[dict, None]:
+    def models(self) -> dict | None:
         """Override in subclass to specify a mapping of user-friendly keys to actual model identifiers."""
         return None
 
     @property
-    def logprobs_models(self) -> List[str]:
+    def logprobs_models(self) -> list[str]:
         """Override in subclass to specify which models support logprobs."""
         return []
 
@@ -63,7 +64,7 @@ class Provider(Module, ABC):
     def get_available_option_values(self) -> ModuleOptionsHint:
         """Return supported attack options; Tuple[options (default is first), llm_required]."""
         if self.models is not None:
-            return [model for model in self.models.keys()], True
+            return [model for model in self.models], True
 
         else:
             return [], True
@@ -72,8 +73,8 @@ class Provider(Module, ABC):
     def setup(
         self,
         model: str,
-        max_tokens: Union[int, None] = None,
-        temperature: Union[float, None] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **additional_kwargs,
     ) -> None:
         """Sets up the provider with the specified model and parameters."""
@@ -99,12 +100,12 @@ class Provider(Module, ABC):
 
         try:
             response = self._invoke(messages)
-        except ProviderError as e:
-            raise e
+        except ProviderError:
+            raise
 
         except Exception as e:
             raise ProviderError(
-                f"A generic error occurred while invoking the provider: {str(e)}",
+                f"A generic error occurred while invoking the provider: {e!s}",
                 prompt=messages,
                 response=None,
                 metadata={"error_type": type(e).__name__, "error_message": str(e)},
@@ -165,11 +166,11 @@ class Provider(Module, ABC):
         finally:
             try:
                 loop.run_until_complete(loop.shutdown_asyncgens())
-            except Exception:
+            except RuntimeError:
                 pass
             try:
                 loop.run_until_complete(loop.shutdown_default_executor())
-            except Exception:
+            except RuntimeError:
                 pass
             # NOTE: Intentionally NOT calling loop.close().
             # httpx AsyncClient.__del__ finalizers may fire after this point

@@ -7,24 +7,19 @@ on:
     branches:
       - main
       - develop
-  push:
-    branches:
-      - main
-      - develop
 
 permissions:
-  contents: write  # needed for lint job to push auto-fix commits back to the PR branch
+  contents: read
 
 jobs:
   lint:
     runs-on: ubuntu-latest
-    # Skipped on workflow_call (release) — lint is not part of the release process
-    if: github.event_name != 'workflow_call'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || '' }}
+          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || '' }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -32,21 +27,13 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install ruff
-        run: pip install ruff
+      - name: Install ruff # Ruff pinned 10/09/2026
+        run: pip install ruff==0.16.6 
 
-      - name: Auto-format, sort imports, and fix lint
-        shell: bash
+      - name: Check formatting, imports, and lint
         run: |
-          ruff format .
-          ruff check --fix .
-          if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "style: auto-format & lint via ruff"
-            git push
-          fi
+          ruff format --check ./spikee/
+          ruff check ./spikee/
 
   functional-tests:
     runs-on: ubuntu-latest
@@ -57,8 +44,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # On PRs, check out the head ref so we get any lint-fix commits
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || '' }}
+          # On PRs, check out the head repository and ref so fork branches are available.
+          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || '' }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
